@@ -1,0 +1,732 @@
+Unsupervised Anomaly Detection with Generative Adversarial Networks to Guide Marker Discovery
+マーカー発見を導くための生成的逆説ネットワークを用いた教師なし異常検出
+
+
+
+
+Abstract. 
+
+Obtaining models that capture imaging markers relevant for disease progression and treatment monitoring is challenging. 
+疾患の進行や治療モニタリングに関連するイメージングマーカーを捕捉するモデルを得ることは困難である。
+
+Models are typically based on large amounts of data with annotated examples of known markers aiming at automating detection. 
+モデルは一般的に、検出の自動化を目的とした既知のマーカーのアノテーションされた例を用いた大量のデータに基づいています。
+
+High annotation effort and the limitation to a vocabulary of known markers limit the power of such approaches. 
+アノテーションの労力が高く、既知のマーカーの語彙が限られているため、そのようなアプローチの威力は限られています。
+
+Here, we perform unsupervised learning to identify anomalies in imaging data as candidates for markers. 
+ここでは、教師なし学習を用いて、画像データの異常をマーカーの候補として同定する。
+
+We propose AnoGAN, a deep convolutional generative adversarial network to learn a manifold of normal anatomical variability, accompanying a novel anomaly scoring scheme based on the mapping from image space to a latent space. 
+我々は、画像空間から潜在空間へのマッピングに基づいた新しい異常スコアリングスキームに付随して、正常な解剖学的変動の多様性を学習するための深層畳み込み生成的敵対的ネットワークであるAnoGANを提案する。
+
+Applied to new data, the model labels anomalies, and scores image patches indicating their fit into the learned distribution. 
+新しいデータに適用すると、モデルは異常をラベル付けし、学習された分布への適合性を示す画像パッチをスコア化する。
+
+Results on optical coherence tomography images of the retina demonstrate that the approach correctly identifies anomalous images, such as images containing retinal fluid or hyperreflective foci.
+網膜の光コヒーレンス・トモグラフィー画像での結果は、このアプローチが網膜液を含む画像や反射率の高い病巣などの異常画像を正しく識別できることを示している。
+
+
+
+1
+Introduction
+
+The detection and quantification of disease markers in imaging data is critical during diagnosis, and monitoring of disease progression, or treatment response.
+画像データ中の疾患マーカーの検出と定量化は、診断、および疾患の進行や治療効果のモニタリングの際に非常に重要である。
+
+Relying on the vocabulary of known markers limits the use of imaging data containing far richer relevant information. 
+既知のマーカーの語彙に頼ると、はるかに豊かな関連情報を含む画像データの使用が制限されます。
+
+Here, we demonstrate that relevant anomalies can be identified by unsupervised learning on large-scale imaging data.
+ここでは、大規模な画像データに対して教師なし学習を行うことで、関連する異常を特定できることを実証している。
+
+Medical imaging enables the observation of markers correlating with disease status, and treatment response. 
+医用画像診断では、病状や治療反応と相関するマーカーを観察することができます。
+
+While there is a wide range of known markers (e.g., characteristic image appearance of brain tumors or calcification patterns in breast screening), many diseases lack a sufficiently broad set, while in others the predictive power of markers is limited. 
+広範囲の既知のマーカー（例えば、脳腫瘍の特徴的な画像の出現や乳房スクリーニングにおける石灰化パターンなど）がある一方で、多くの疾患では十分な範囲のマーカーが不足しており、他の疾患ではマーカーの予測力が限られている。
+
+Furthermore, even if predictive markers are known, their computational detection in imaging data typically requires extensive supervised training using large amounts of annotated data such as labeled lesions. 
+さらに、予測マーカーが知られている場合でも、画像データにおけるその計算上の検出には、一般的に、ラベル付けされた病変のような大量のアノテーションデータを用いた大規模な教師付き訓練が必要である。
+
+This limits our ability to exploit imaging data for treatment decisions.
+これは、治療決定のために画像データを利用する能力を制限しています。
+
+Here, we propose unsupervised learning to create a rich generative model of healthy local anatomical appearance. 
+ここでは、教師なし学習を用いて、健康的な局所解剖学的外観の豊かな生成モデルを作成することを提案する。
+
+We show how generative adversarial networks (GANs) can solve the central problem of creating a sufficiently representative model of appearance, while at the same time learning a generative and discriminative component. 
+我々は、生成的・識別的な要素を学習すると同時に、出現の十分に代表的なモデルを作成するという中心的な問題を、生成的逆襲ネットワーク(GAN)がどのように解決できるかを示す。
+
+We propose an improved technique for mapping from image space to latent space. 
+本研究では、画像空間から潜在空間へのマッピングの改良手法を提案する。
+
+We use both components to differentiate between observations that conform to the training data and such data that does not fit.
+訓練データに適合するオブザベーションと適合しないデータを区別するために、両方の成分を使用しています。
+
+
+
+Fig. 1. 
+
+Anomaly detection framework. The preprocessing step includes extraction and flattening of the retinal area, patch extraction and intensity normalization. 
+異常検出フレームワーク。前処理ステップには、網膜領域の抽出と平坦化、パッチ抽出、強度正規化が含まれます。
+
+Generative adversarial training is performed on healthy data and testing is performed on both, unseen healthy cases and anomalous data.
+健全なデータに対して生成的な敵対的訓練を行い、目に見えない健全なケースと異常なデータの両方に対してテストを行います。
+
+Related Work Anomaly detection is the task of identifying test data not fitting the normal data distribution seen during training. 
+関連作業 異常検出とは、トレーニング中に見られる正規データ分布に適合しないテストデータを特定する作業です。
+
+Approaches for anomaly detection exist in various domains, ranging from video analysis [1] to remote sensing [2]. 
+異常検知のためのアプローチは、映像解析[1]からリモートセンシング[2]に至るまで、様々な領域に存在する。
+
+They typically either use an explicit representation of the distribution of normal data in a feature space, and determine outliers based on the local density at the observations’ position in the feature space. 
+彼らは通常，特徴空間における正規データの分布の明示的表現を使用し，特徴空間におけるオブザベーションの位置での局所密度に基づいて外れ値を決定する．
+
+Carrera et al. [3] utilized convolutional sparse models to learn a dictionary of filters to detect anomalous regions in texture images. 
+Carreraら[3]は、畳み込みスパースモデルを利用して、テクスチャ画像の異常領域を検出するためのフィルタの辞書を学習した。
+
+Erfani et al. [4] proposed a hybrid model for unsupervised anomaly detection that uses a one-class support vector machine (SVM). 
+Erfaniら[4]は、1クラスのサポートベクターマシン(SVM)を用いた教師なし異常検知のためのハイブリッドモデルを提案している。
+
+The SVM was trained from features that were learned by a deep belief network (DBN). 
+SVMは、ディープビリーフネットワーク(DBN)で学習した特徴量から学習した。
+
+The experiments in the aforementioned works were performed on real-life-datasets comprising 1D inputs, synthetic data or texture images, which have lower dimensionality or different data characteristics compared to medical images. 
+前述の著作物の実験は、医療用画像と比較して低次元であったり、データ特性が異なる１次元入力、合成データまたはテクスチャ画像からなる実生活用のデータセットを用いて行われた。
+
+An investigation of anomaly detection research papers can be found in [5]. 
+異常検知の研究論文の調査は、[5]に掲載されています。
+
+In clinical optical coherence tomography (OCT) scan analysis, Ven-huizen et al. [6] used bag-of-word features as a basis for supervised random forest classifier training to distinguish diseased patients from healthy subjects.
+臨床光コヒーレンス・トモグラフィー（OCT）スキャン解析において、Ven-huizenら[6]は、病気の患者と健康な被験者を区別するための教師付きランダムフォレスト分類器訓練の基礎として、バッグ・オブ・ワード特徴量を使用した。
+
+Schlegl et al. [7] utilized convolutional neural networks to segment retinal fluid regions in OCT data via weakly supervised learning based on semantic descriptions of pathology-location pairs extracted from medical reports. 
+Schleglら[7]は、医療報告書から抽出された病理学的位置対の意味的記述に基づく弱教師付き学習により、OCTデータ中の網膜液領域をセグメント化するために畳み込みニューラルネットワークを利用した。
+
+In contrast to our approach, both works used some form of supervision for classifier training.
+我々のアプローチとは対照的に、どちらの研究も分類器の訓練に何らかの形の監視を用いています。
+
+Seeb¨ock et al. [8] identified anomalous regions in OCT images through unsupervised learning on healthy examples, using a convolutional autoencoder and a one-class SVM, and explored different classes of anomalies. 
+Seeb¨ockら[8]は、畳み込みオートエンコーダーと1クラスSVMを用いて、健康な例に対して教師なし学習を行い、OCT画像の異常領域を同定し、異なるクラスの異常を探索した。
+
+In contrast to this work, the SVM in [8] involved the need to choose a hyper-parameter that defined the amount of training points covered by the estimated healthy region.
+これとは対照的に、[8]のSVMでは、推定された健常領域がカバーする訓練点の量を定義するハイパーパラメータを選択する必要があった。
+
+GANs enable to learn generative models generating detailed realistic images [9,10,11]. 
+GANは、詳細なリアルな画像を生成する生成モデルを学習することが可能である[9,10,11]。
+
+Radford et al. [12] introduced deep convolutional generative adversarial networks (DCGANs) and showed that GANs are capable of capturing semantic image content enabling vector arithmetic for visual concepts. 
+Radfordら[12]は、深層畳み込み生成的逆境ネットワーク(DCGAN)を導入し、GANが意味的な画像コンテンツをキャプチャし、視覚的な概念のベクトル演算を可能にすることを示した。
+
+Yeh et al. [13] trained GANs on natural images and applied the trained model for semantic image inpainting. 
+Yehら[13]は自然画像上でGANを訓練し，訓練されたモデルをセマンティック画像のインペイントに適用した．
+
+Compared to Yeh et al. [13], we implement two adaptations for an improved mapping from images to the latent space. 
+Yeh et al. [13]と比較して，画像から潜在空間へのマッピングを改善するための2つの適応策を実装する．
+
+We condition the search in the latent space on the whole query image, and propose a novel variant to guide the search in the latent space (inspired by feature matching [14]). 
+我々は，潜在空間内の検索をクエリ画像全体に条件付けし，潜在空間内の検索を誘導するための新しいバリアントを提案する（特徴照合[14]に触発された）．
+
+In addition, we define an anomaly score, which is not needed in an inpainting task.
+また、インペイントタスクでは不要なアノマリースコアを定義しています。
+
+The main difference of this paper to aforementioned anomaly detection work is the representative power of the generative model and the coupled mapping schema, which utilizes a trained DCGAN and enables accurate discrimination between normal anatomy, and local anomalous appearance. 
+本論文が上述の異常検出研究と大きく異なる点は、生成モデルと連成マッピングスキーマの代表的な力であり、訓練されたDCGANを利用して、正常な解剖学的異常と局所的な異常を正確に識別することが可能である。
+
+This renders the detection of subtle anomalies at scale feasible.
+これにより、スケールでの微妙な異常の検出が可能になります。
+
+
+Contribution In this paper, we propose adversarial training of a generative model of normal appearance (see blue block in Figure 1), described in Section 2.1, and a coupled mapping schema, described in Section 2.2, that enables the evaluation of novel data (Section 2.3) to identify anomalous images and segment anomalous regions within imaging data (see red block in Figure 1). 
+貢献 本論文では、第2.1節で述べた正常な外観の生成モデル（図1の青ブロック参照）と、第2.2節で述べた連成マッピングスキーマ（第2.2節で述べた連成マッピングスキーマ）の敵対的訓練を提案し、新規データの評価（第2.3節）を可能にし、画像データ内の異常画像の識別と異常領域のセグメント化（図1の赤ブロック参照）を可能にします。
+
+Experiments on labeled test data, extracted from spectral-domain OCT (SD-OCT) scans, show that this approach identifies known anomalies with high accuracy, and at the same time detects other anomalies for which no voxel-level annotations are available. 
+スペクトル領域OCT(SD-OCT)スキャンから抽出したラベル付きテストデータを用いた実験では、このアプローチは既知の異常を高精度に同定すると同時に、ボクセルレベルのアノテーションが利用できない他の異常も検出できることが示された。
+
+To the best of our knowledge, this is the first work, where GANs are used for anomaly or novelty detection. 
+私たちの知る限りでは、これがGANを異常検出や新規性検出に利用した最初の研究です。
+
+Additionally, we propose a novel mapping approach, wherewith the pre-image problem can be tackled.
+さらに、新たなマッピング手法を提案することで、プリイメージ問題に取り組むことができる。
+
+
+
+
+
+2
+Generative Adversarial Representation Learning to Identify Anomalies
+異常を識別するための生成的逆説表現学習
+
+To identify anomalies, we learn a model representing normal anatomical variability based on GANs [13]. 
+異常を識別するために、GAN[13]に基づいて正常な解剖学的変動を表すモデルを学習する。
+
+This method trains a generative model, and a discriminator to distinguish between generated and real data simultaneously (see Figure 2(a)). 
+この方法では、生成モデルを学習し、生成データと実データを同時に区別する識別器を学習する（図2(a)参照）。
+
+Instead of a single cost function optimization, it aims at the Nash equilibrium of costs, increasing the representative power and specificity of the generative model, while at the same time becoming more accurate in classifying real- from generated data and improving the corresponding feature mapping. 
+単一のコスト関数最適化ではなく、コストのナッシュ均衡を目指し、生成モデルの代表性と特異性を高めると同時に、生成データから実データを分類する際の精度を高め、対応する特徴量のマッピングを向上させる。
+
+In the following we explain how to build this model (Section 2.1), and how to use it to identify appearance not present in the training data (Sections 2.2 and 2.3).
+以下では、このモデルの構築方法（2.1節）と、学習データに含まれない外見を識別する方法（2.2節、2.3節）について説明する。
+
+
+
+Fig. 2. 
+(a) Deep convolutional generative adversarial network. 
+(a) ディープ畳み込み生成逆説ネットワーク。
+
+(b) t-SNE embedding of normal (blue) and anomalous (red) images on the feature representation of the last convolution layer (orange in (a)) of the discriminator.
+(b) 判別器の最後の畳み込み層（(a)のオレンジ色）の特徴表現上に、正常画像（青）と異常画像（赤）のt-SNE埋め込み。
+
+
+
+
+
+
+
+2.1
+Unsupervised Manifold Learning of Normal Anatomical Variability
+正常解剖学的変動の教師なしマニホールド学習
+
+We are given a set of M medical images Im showing healthy anatomy, with
+m = 1, 2, . . . , M, where Im ∈ Ra×b is an intensity image of size a × b. 
+私達は健康な解剖学を示す M の医学のイメージのセットを与えられます
+サイズa×bの強度画像。
+
+
+
+From each image Im, we extract K 2D image patches xk,m of size c×c from randomly sampled positions resulting in data x = xk,m ∈ X, with k = 1, 2, . . . , K.
+各画像Imから、ランダムにサンプリングされた位置からサイズc×cのK個の2次元画像パッチxk,mを抽出する。
+
+
+
+During training we are only given ⟨Im⟩ and train a generative adversarial model to learn the manifold X (blue region in Figure 2(b)), which represents the variability of the training images, in an unsupervised fashion. 
+学習中は、⟨Im⟩を与えられ、学習画像のばらつきを表す多様体X（図2(b)の青い領域）を教師なしで学習するために、生成的逆説モデルを学習します。
+
+For testing, we are given ⟨yn, ln⟩, where yn are unseen images of size c × c extracted from new testing data J and ln ∈ {0, 1} is an array of binary image-wise ground-truth labels, with n = 1, 2, . . . , N. 
+テストのために、我々は、⟨yn, ln⟩を与えられ、ここで、ynは新しいテストデータJから抽出されたサイズc×cの未見画像であり、ln ∈{0, 1}は、n = 1, 2, ... , Nの2値画像ごとの基底真実ラベルの配列である。, N. 
+
+These labels are only given during testing, to evaluate the anomaly detection performance based on a given pathology.
+これらのラベルは、与えられた病理学に基づいて異常検出性能を評価するために、テスト中にのみ与えられます。
+
+
+
+
+
+
+Encoding Anatomical Variability with a Generative Adversarial Network. 
+ジェネレーティブ・アドバーサリアル・ネットワークを用いた解剖学的多様性の符号化。
+
+A GAN consists of two adversarial modules, a generator G and a discriminator D. 
+GANは、生成器Gと識別器Dの2つの逆説モジュールから構成されています。
+
+The generator G learns a distribution pg over data x via a mapping G(z) of samples z, 1D vectors of uniformly distributed input noise sampled from latent space Z, to 2D images in the image space manifold X, which is populated by healthy examples. 
+ジェネレータGは、サンプルz、潜在空間Zからサンプリングされた一様分布の入力ノイズの1次元ベクトル、健康な例で構成された画像空間多様体Xの2次元画像へのサンプルzのマッピングG(z)を介して、データx上の分布pgを学習します。
+
+In this setting, the network architecture of the generator G is equivalent to a convolutional decoder that utilizes a stack of strided convolutions. 
+この設定では、生成器Ｇのネットワークアーキテクチャは、ストライドされたコンボリューションのスタックを利用するコンボリューションデコーダに相当する。
+
+The discriminator D is a standard CNN that maps a 2D image to a single scalar value D(·). 
+判別器Dは，2次元画像を1つのスカラー値D(-)に写像する標準的なCNNである．
+
+The discriminator output D(·) can be interpreted as probability that the given input to the discriminator D was a real image x sampled from training data X or generated G(z) by the generator G. 
+判別器出力D(-)は，判別器Dへの与えられた入力が，訓練データXからサンプリングされた実画像xであるか，生成器Gによって生成されたG(z)であるかの確率として解釈できる．
+
+D and G are simultaneously optimized through the following two-player minimax game with value function V (G, D) [9]:
+DとGは、値関数V(G, D)を用いた以下の2プレイヤーミニマックスゲームによって同時に最適化される[9]。
+
+min
+G max
+D V (D, G) = Ex∼pdata(x) [log D(x)] + Ez∼pz(z) [log(1 − D(G(z)))] .
+(1)
+
+
+The discriminator is trained to maximize the probability of assigning real training examples the “real” and samples from pg the “fake” label. 
+識別器は、実際の訓練例を「本物」、pgからのサンプルを「偽物」ラベルに割り当てる確率を最大にするように訓練されます。
+
+The generator G is simultaneously trained to fool D via minimizing V (G) = log(1 − D(G(z))), which is equivalent to maximizing 
+V (G) = D(G(z)). (2)
+
+生成器Ｇは、Ｖ（Ｇ）＝ｌｏｇ（１-Ｄ（Ｇ（ｚ）））の最小化を介してＤを騙すように同時に訓練されるが、これはV (G) = D(G(z)). (2)を最大化することと等価である。
+
+
+During adversarial training the generator improves in generating realistic images and the discriminator progresses in correctly identifying real and generated images.
+逆境トレーニングの間、生成器は現実的な画像を生成する際に改善され、識別器は実際の画像と生成された画像を正しく識別するために進歩します。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+2.2
+Mapping new Images to the Latent Space
+新しい画像を潜在空間にマッピングする
+
+When adversarial training is completed, the generator has learned the mapping G(z) = z �→ x from latent space representations z to realistic (normal) images x. 
+敵対訓練が完了すると、生成器は、潜在空間表現ｚから現実的な（通常の）画像ｘへの写像Ｇ（ｚ）＝ｚ �→ｘを学習したことになる。
+
+But GANs do not automatically yield the inverse mapping µ(x) = x �→ z for free. 
+しかし、GAN は自動的に逆写像 µ(x) = x �→ z を自由に得られるわけではありません。
+
+The latent space has smooth transitions [12], so sampling from two points close in the latent space generates two visually similar images. 
+潜在空間は滑らかな遷移を持つ[12]ので、潜在空間内の近い2つの点からサンプリングすると、視覚的に類似した2つの画像が生成される。
+
+Given a query image x, we aim to find a point z in the latent space that corresponds to an image G(z) that is visually most similar to query image x and that is located on the manifold X. 
+クエリ画像 x が与えられた場合，我々は，クエリ画像 x と視覚的に最も類似し，かつ多様体 X 上に位置する画像 G(z) に対応する潜在空間の点 z を見つけることを目的としている．
+
+The degree of similarity of x and G(z) depends on to which extent the query image follows the data distribution pg that was used for training of the generator. 
+xとG(z)の類似度は、クエリ画像が生成器の学習に使用されたデータ分布pgにどの程度従うかに依存します。
+
+To find the best z, we start with randomly sampling z1 from the latent space distribution Z and feed it into the trained generator to get a generated image G(z1). 
+最高のzを見つけるために、我々は、潜在空間分布Zからランダムにz1をサンプリングすることから始め、それを訓練された生成器に送り込み、生成された画像G(z1)を得る。
+
+Based on the generated image G(z1) we define a loss function, which provides gradients for the update of the coefficients of z1 resulting in an updated position in the latent space, z2. 
+生成された画像 G(z1) に基づいて、潜在空間内の更新された位置 z2 をもたらす z1 の係数の更新のための勾配を提供する損失関数を定義します。
+
+In order to find the most similar image G(zΓ ), the location of z in the latent space Z is optimized in an iterative process via γ = 1, 2, . . . , Γ backpropagation steps.
+最も類似した画像 G(zΓ )を見つけるために、潜在空間 Z 内の z の位置は、γ = 1, 2, ... , ... ,Γバックプロパゴスステップを介した反復プロセスで最適化されます。Γバックプロパゲーションのステップを経て、反復プロセスで z の位置を最適化します。
+
+In the spirit of [13], we define a loss function for the mapping of new images to the latent space that comprises two components, a residual loss and a discrimination loss. 
+13]の精神に基づき、新しい画像を潜在空間に写像するための損失関数を定義する。
+
+The residual loss enforces the visual similarity between the generated image G(zγ) and query image x. 
+残差損失は、生成画像Ｇ（ｚγ）とクエリ画像ｘとの間の視覚的類似度を強制する。
+
+The discrimination loss enforces the generated image G(zγ) to lie on the learned manifold X. 
+判別損失は、生成された画像G(zγ)が学習された多様体X上に存在することを強制する。
+
+Therefore, both components of the trained GAN, the discriminator D and the generator G, are utilized to adapt the coefficients of z via backpropagation. 
+したがって、学習されたGANの両方のコンポーネント、識別器Dと生成器Gは、バックプロパゲーションを介してzの係数を適応させるために利用される。
+
+In the following, we give a detailed description of both components of the loss function.
+以下では、損失関数の両成分について詳細に説明する。
+
+
+
+
+
+
+Residual Loss The residual loss measures the visual dissimilarity between query image x and generated image G(zγ) in the image space and is defined by LR(zγ) =�|x − G(zγ)|. (3)
+残差損失 残差損失とは、画像空間における問い合わせ画像 x と生成画像 G(zγ)との視覚的な非類似度を測定するもので、LR(zγ) =�|x - G(zγ)|で定義されます。(3)
+
+Under the assumption of a perfect generator G and a perfect mapping to latent space, for an ideal normal query case, images x and G(zγ) are identical. 
+完全な生成器Gと潜在空間への完全な写像を仮定すると、理想的な通常の問い合わせの場合、画像xとG(zγ)は同一である。
+
+In this case, the residual loss is zero.
+この場合、残留損失はゼロとなる。
+
+
+Discrimination Loss For image inpainting, Yeh et al. [13] based the computation of the discrimination loss L ˆD(zγ) on the discriminator output by feeding the generated image G(zγ) into the discriminator L ˆD(zγ) = σ(D(G(zγ)), α), where σ is the sigmoid cross entropy, which defined the discriminator loss of real images during adversarial training, with logits D(G(zγ)) and targets α = 1.
+判別損失 画像インペイントでは、Yehら[13]は、生成された画像G(zγ)を弁別器に投入することで、弁別器出力上の弁別損失L ˆD(zγ)の計算に基づいて、L ˆD(zγ) = σ(D(G(zγ), α), ここでσはシグモイドクロスエントロピーであり、ロジットD(G(zγ))とターゲットα=1での敵対学習中の実画像の弁別損失を定義しています。
+
+
+
+An improved discrimination loss based on feature matching In contrast to the work of Yeh et al. [13], where zγ is updated to fool D, we define an alternative discrimination loss LD(zγ), where zγ is updated to match G(zγ) with the learned distribution of normal images. This is inspired by the recently proposed feature matching technique [14].
+Yehら[13]の研究では、zγがDを誤魔化すために更新されるのとは対照的に、我々は代替的な識別損失LD(zγ)を定義し、ここではzγが学習した正規画像の分布G(zγ)と一致するように更新される。これは、最近提案された特徴マッチング技術[14]に触発されたものである。
+
+Feature matching addresses the instability of GANs due to over-training on the discriminator response [14]. 
+特徴マッチングは、識別器応答の過剰訓練によるGANの不安定性に対処するものである[14]。
+
+In the feature matching technique, the objective function for optimizing the generator is adapted to improve GAN training.
+特徴マッチング技術では、生成器を最適化するための目的関数がGANの訓練を改善するように適応されます。
+
+Instead of optimizing the parameters of the generator via maximizing the discriminator’s output on generated examples (Eq. (2)), the generator is forced to generate data that has similar statistics as the training data, i.e. whose intermediate feature representation is similar to those of real images. Salimans et al. [14] found that feature matching is especially helpful when classification is the target task. 
+生成された例に対する判別器の出力を最大化することで生成器のパラメータを最適化するのではなく（式(2)）、生成器は訓練データと同様の統計量を持つデータ、すなわち中間的な特徴表現が実画像のものと類似しているデータを生成することを余儀なくされる。Salimansら[14]は、分類が目的のタスクである場合には、特徴照合が特に有用であることを発見した。
+
+Since we do not use any labeled data during adversarial training, we do not aim for learning class-specific discriminative features but we aim for learning good representations. 
+逆境訓練ではラベル付けされたデータを使用しないので、クラス固有の識別特徴を学習することを目的とせず、良い表現を学習することを目的としている。
+
+Thus, we do not adapt the training objective of the generator during adversarial training, but instead use the idea of feature matching to improve the mapping to the latent space. 
+このように、我々は逆境訓練中に生成器の訓練目的を適応させるのではなく、代わりに、潜在空間へのマッピングを改善するために特徴マッチングのアイデアを使用する。
+
+Instead of using the scalar output of the discriminator for computing the discrimination loss, we propose to use a richer intermediate feature representation of the discriminator and define the discrimination loss as follows:
+LD(zγ) =�|f(x) − f(G(zγ))|, (4)
+識別器のスカラー出力を弁別損失の計算に用いる代わりに、よりリッチな中間特徴表現を用いて弁別損失を以下のように定義することを提案します。
+
+
+where the output of an intermediate layer f(·) of the discriminator is used to specify the statistics of an input image. 
+ここで、判別器の中間層f(-)の出力は、入力画像の統計量を指定するために使用される。
+
+Based on this new loss term, the adaptation of the coordinates of z does not only rely on a hard decision of the trained discriminator, whether or not a generated image G(zγ) fits the learned distribution of normal images, but instead takes the rich information of the feature representation, which is learned by the discriminator during adversarial training, into account. 
+この新しい損失項に基づいて、zの座標の適応は、生成された画像G(zγ)が学習された正規画像の分布に適合するかどうかという訓練された判別器のハードな判断に依存するだけでなく、逆境訓練中に判別器によって学習された特徴表現の豊富な情報を考慮に入れている。
+
+In this sense, our approach utilizes the trained discriminator not as classifier but as a feature extractor.
+この意味で、我々のアプローチは、訓練された判別器を分類器としてではなく、特徴抽出器として利用する。
+
+
+
+
+
+For the mapping to the latent space, we define the overall loss as weighted sum of both components:
+潜在空間へのマッピングについては、全体の損失を両成分の加重和として定義します。
+
+L(zγ) = (1 − λ) · LR(zγ) + λ · LD(zγ).(5)
+
+Only the coefficients of z are adapted via backpropagation. The trained parameters of the generator and discriminator are kept fixed.
+z の係数のみがバックプロパゲーションによって適応される。生成器と判別器の訓練されたパラメータは固定されたままである．
+
+
+
+
+
+2.3
+Detection of Anomalies During anomaly identification in new data we evaluate the new query image x as being a normal or anomalous image. 
+異常の検出 新しいデータの異常を識別する際に、新しいクエリ画像xが正常または異常画像であるかどうかを評価します。
+
+Our loss function (Eq. (5)), used for mapping to the latent space, evaluates in every update iteration γ the compatibility of generated images G(zγ) with images, seen during adversarial training. 
+潜在空間へのマッピングに使用される損失関数（式（５））は、更新反復γごとに、生成された画像Ｇ（ｚγ）と敵対的訓練中に見られる画像との適合性を評価するものである。
+
+Thus, an anomaly score, which expresses the fit of a query image x to the model of normal images, can be directly derived from the mapping loss function (Eq. (5)):
+A(x) = (1 − λ) · R(x) + λ · D(x), (6)
+このように、クエリ画像ｘの正規画像のモデルへの適合性を表すアノマリースコアは、マッピング損失関数（式（５））から直接導出することができる。
+
+where the residual score R(x) and the discrimination score D(x) are defined by the residual loss LR(zΓ ) and the discrimination loss LD(zΓ ) at the last (Γ th) update iteration of the mapping procedure to the latent space, respectively. 
+ここで、残差スコアR(x)と判別スコアD(x)は、それぞれ潜在空間への写像手順の最後の(Γ th)更新反復における残差損失LR(zΓ )と判別損失LD(zΓ )によって定義されます。
+
+The model yields a large anomaly score A(x) for anomalous images, whereas a small anomaly score means that a very similar image was already seen during training.
+このモデルは、異常画像に対して大きな異常スコアA(x)を生成しますが、小さな異常スコアは、訓練中に非常に類似した画像がすでに見られていたことを意味します。
+
+We use the anomaly score A(x) for image based anomaly detection. 
+画像ベースの異常検出には、異常スコアA(x)を使用します。
+
+Additionally, the residual image xR = |x − G(zΓ )| is used for the identification of anomalous regions within an image. 
+さらに、残差画像 xR = |x - G(zΓ )|は、画像内の異常領域を識別するために使用されます。
+
+For purposes of comparison, we additionally define a reference anomaly score ˆA(x) = (1 − λ) · R(x) + λ · ˆD(x), where ˆD(x) = L ˆD(zΓ ) is the reference discrimination score used by Yeh et al. [13].
+比較のために、追加で基準異常スコア ˆA(x) = (1 - λ) - R(x) + λ - ˆD(x)を定義し、ここで ˆD(x) = L ˆD(zΓ )はYehら[13]によって使用された基準判別スコアです。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+3
+Experiments
+実験
+
+Data, Data Selection and Preprocessing We evaluated the method on clinical high resolution SD-OCT volumes of the retina with 49 B-scans (representing an image slice in zx-plane) per volume and total volume resolutions of 496×512×49 voxels in z-, x-, and y direction, respectively. 
+データ、データの選択と前処理 網膜の臨床的な高解像度SD-OCTボリュームを対象に、1ボリュームあたり49個のBスキャン（zx平面の画像スライスを表す）と、z方向、x方向、y方向にそれぞれ496×512×49個のボクセルの合計ボリューム解像度で評価した。
+
+The GAN was trained on 2D image patches extracted from 270 clinical OCT volumes of healthy subjects, which were chosen based on the criterion that the OCT volumes do not contain fluid regions. 
+GANは、健康な被験者の臨床OCTボリューム270から抽出された2次元画像パッチに基づいて訓練された。
+
+For testing, patches were extracted from 10 additional healthy cases and 10 pathological cases, which contained retinal fluid. 
+検査のために、網膜液を含む健常例10例と病理例10例からパッチを追加で抽出した。
+
+The OCT volumes were preprocessed in the following way. 
+OCTボリュームは、以下のようにして前処理された。
+
+The gray values were normalized to range from -1 to 1. The volumes were resized in x-direction to a size of 22µm resulting in approximately 256 columns. 
+グレー値は-1から1の範囲で正規化され、体積はx方向に22μmのサイズにリサイズされ、約256列になりました。
+
+The retinal area was extracted and flattened to adjust for variations in orientation, shape and thickness. We used an automatic layer segmentation algorithm following [15] to find the top and bottom layer of the retina that define the border of the retina in z-direction. 
+網膜領域を抽出し、方向、形状、厚さのばらつきを調整するために平坦化した。ｚ方向に網膜の境界を定義する網膜の最上層と最下層を見つけるために、[15]に従った自動層セグメンテーションアルゴリズムを使用した。
+
+From these normalized and flattened volumes, we extracted in total 1.000.000 2D training patches with an image resolution of 64×64 pixels at randomly sampled positions.
+これらの正規化され平坦化されたボリュームから、ランダムにサンプリングされた位置にある64×64ピクセルの画像解像度を持つ2次元学習パッチを合計1,000,000,000個抽出した。
+
+Raw data and preprocessed image representation are shown in Figure 1. 
+生データと前処理された画像表現を図1に示す。
+
+The test set in total consisted of 8192 image patches and comprised normal and pathological samples from cases not included in the training set. 
+テストセットは合計8192枚の画像パッチで構成され、トレーニングセットに含まれていない症例からの正常サンプルと病理学的サンプルで構成されています。
+
+For pathological OCT scans, voxel-wise annotations of fluid and non-fluid regions from clinical retina experts were available. 
+病理的なOCTスキャンについては、臨床網膜の専門家から流体と非流体領域のボクセル単位のアノテーションが利用可能であった。
+
+These annotations were only used for statistical evaluation but were never fed to the network, neither during training nor in the evaluation phase. 
+これらのアノテーションは統計的評価のためにのみ使用されましたが、トレーニング中も評価段階でもネットワークに供給されることはありませんでした。
+
+For the evaluation of the detection performance, we assigned a positive label to an image, if it contained at least a single pixel annotated as retinal fluid.
+検出性能の評価では、網膜液と注記された画素が1画素以上含まれている画像にポジティブラベルを付与することで検出性能を評価した。
+
+Evaluation The manifold of normal images was solely learned on image data of healthy cases with the aim to model the variety of healthy appearance. 
+評価 健常者の多様な外観をモデル化するために、健常者の画像データのみを用いて正常画像の多様性を学習した。
+
+For performance evaluation in anomaly detection we ran the following experiments.
+異常検出の性能評価のために、以下の実験を行った。
+
+(1) We explored qualitatively whether the model can generate realistic images.
+(1) モデルが現実的な画像を生成できるかどうかを定性的に検討した。
+
+This assessment was performed on image patches of healthy cases extracted from the training set or test set and on images of diseased cases extracted from the test set.
+この評価は，トレーニングセットまたはテストセットから抽出した健康な症例の画像パッチと，テストセットから抽出した病気の症例の画像を用いて行った．
+
+(2) We evaluated quantitatively the anomaly detection accuracy of our approach on images extracted from the annotated test set. 
+(2) アノテーションされたテストセットから抽出した画像を用いて、本手法の異常検出精度を定量的に評価した。
+
+We based the anomaly detection on the anomaly score A(x) or only on one of both components, on the residual score R(x) or on the discrimination score D(x) and report receiver operating characteristic (ROC) curves of the corresponding anomaly detection performance on image level.
+我々は、異常検出を異常スコアA(x)またはその片方のみ、残差スコアR(x)または弁別スコアD(x)に基づいて行い、画像レベルでの対応する異常検出性能の受信機動作特性(ROC)曲線を報告する。
+
+Based on our proposed anomaly score A(x), we evaluated qualitatively the segmentation performance and if additional anomalies were identified.
+また、提案した異常スコアA(x)に基づいて、セグメンテーション性能を定性的に評価し、追加的な異常が検出されたかどうかを評価した。
+
+(3) To provide more details of individual components’ roles, and the gain by the proposed approach, we evaluated the effect on the anomaly detection performance, when for manifold learning the adversarial training is not performed with a DCGAN but with an adversarial convolutional autoencoder (aCAE) [16], while leaving the definition of the anomaly score unchanged. 
+(3) 個々の構成要素の役割や提案手法の効果をより詳細に説明するために、異常スコアの定義はそのままに、多様な学習を行う際に、DCGANではなく、逆説的畳み込み自動エンコーダー(aCAE)で学習を行った場合の異常検出性能への影響を評価した[16]。
+
+An aCAE also implements a discriminator but replaces the generator by an encoder-decoder pipeline. 
+aCAEも識別器を実装していますが、生成器をエンコーダ-デコーダパイプラインで置き換えています。
+
+The depth of the components of the trained aCAE was comparable to the depth of our adversarial model. 
+学習されたaCAEの構成要素の深さは、我々の敵対モデルの深さに匹敵するものであった。
+
+As a second alternative approach, denoted as GANR, we evaluated the anomaly detection performance, when the reference anomaly score ˆA(x), or the reference discrimination score ˆD(x) were utilized for anomaly scoring and the corresponding losses were used for the mapping from image space to latent space, while the pre-trained GAN parameters of the AnoGAN were used. We report ROC curves for both alternative approaches.
+第二の代替アプローチとして、GANRと呼ばれる、基準異常スコアˆA(x)または基準判別スコアˆD(x)を異常スコアリングに利用し、対応する損失を画像空間から潜在空間へのマッピングに利用した場合の異常検出性能を評価した。両方の代替アプローチのROC曲線を報告する。
+
+Furthermore, we calculated sensitivity, specificity, precision, and recall at the optimal cut-off point on the ROC curves, identified through the Youden’s index and report results for the AnoGan and for both alternative approaches.
+さらに、ユーデンの指標を用いて同定したROC曲線上の最適なカットオフ点での感度、特異度、精度、リコールを計算し、AnoGanと両代替アプローチの結果を報告する。
+
+Implementation details As opposed to historical attempts, Radford et al. [12] identified a DCGAN architecture that resulted in stable GAN training on images of sizes 64 × 64 pixels. 
+実装の詳細 過去の試みとは対照的に、Radfordら[12]は、64×64ピクセルのサイズの画像上で安定したGAN学習をもたらすDCGANアーキテクチャを同定した。
+
+
+Hence, we ran our experiments on image patches of the same size and used widley the same DCGAN architecture for GAN training (Section 2.1) as proposed by Radford et al.[12]1. 
+そこで、我々は同じサイズの画像パッチを用いて実験を行い、Radfordら[12]1によって提案されたものと同じDCGANアーキテクチャ（セクション2.1）をGAN学習に広く使用した（セクション2.1）。
+
+We used four fractionally-strided convolution layers in the generator, and four convolution layers in the discriminator, all filters of sizes 5 × 5. Since we processed gray-scale images, we utilized intermediate representations with 512−256−128−64 channels (instead of 1024 − 512 − 256 − 128 used in [12]). 
+生成器には4つの畳み込み層を、判別器には4つの畳み込み層を使用したが、これらはすべて5×5のサイズのフィルタである。グレースケール画像を処理するため、[12]で使用した1024-512-256-128の代わりに、512-256-128-64チャネルの中間表現を使用した。
+
+DCGAN training was performed for 20 epochs utilizing Adam [17], a stochastic optimizer. 
+DCGANの学習は，確率的最適化器であるAdam [17]を用いて20エポックで行った．
+
+We ran 500 backpropagation steps for the mapping (Section 2.2) of new images to the latent space. 
+新しい画像の潜在空間へのマッピング(セクション2.2)のために500回のバックプロパゲーションを実行した。
+
+We used λ = 0.1 in Equations (5) and (6), which was found empirically due to preceding experiments on a face detection dataset. 
+式(5)と(6)ではλ=0.1としたが、これは先行する顔検出データセットでの実験により経験的に判明したものである。
+
+All experiments were performed using Python 2.7 with the TensorFlow [18] library and run on a Titan X graphics processing unit using CUDA 8.0.
+すべての実験はPython 2.7とTensorFlow [18]ライブラリを用いて行われ、CUDA 8.0を用いたTitan Xグラフィックス処理装置上で実行された。
+
+
+
+
+
+
+
+
+
+
+
+Fig. 3. 
+
+Pixel-level identification of anomalies on exemplary images. 
+例示的な画像の異常のピクセルレベルでの識別。
+
+First row: Real input images. Second row: Corresponding images generated by the model triggered by our proposed mapping approach. Third row: Residual overlay. 
+最初の行。実際の入力画像。2行目。提案されたマッピングアプローチによってモデルによって生成された対応する画像。3行目。残留オーバーレイ。
+
+Red bar: Anomaly identification by residual score. 
+赤いバー。残差スコアによる異常の識別。
+
+Yellow bar: Anomaly identification by discrimination score. Bottom row: Pixel-level annotations of retinal fluid. 
+黄色のバー。識別スコアによる異常識別。下段。網膜液のピクセルレベルのアノテーション。
+
+First block and second block:
+最初のブロックと2番目のブロック。
+Normal images extracted from OCT volumes of healthy cases in the training set and test set, respectively. 
+トレーニングセットとテストセットの健常者のOCTボリュームから抽出された正常画像、それぞれ。
+
+Third block: Images extracted from diseased cases in the test set.
+第三ブロック。テストセットの病気の症例から抽出した画像。
+
+Last column: Hyperreflective foci (within green box). (Best viewed in color)
+最後の列。高反射病巣（緑色の枠内）。カラーで見るのがベスト
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+3.1
+Results
+
+Results demonstrate the generative capability of the DCGAN and the appropriateness of our proposed mapping and scoring approach for anomaly detection.
+その結果、DCGANの生成能力と、我々が提案したマッピングとスコアリングのアプローチが異常検出に適していることが示された。
+
+We report qualitative and quantitative results on segmentation performance and detection performance of our approach, respectively.
+本研究では、我々の提案する手法のセグメンテーション性能と検出性能について、それぞれ定性・定量的な結果を報告する。
+
+Can the model generate realistic images? The trained model generates realistic looking medical images (second row in Figure 3) that are conditioned by sampling from latent representations z, which are found through our mapping approach, described in Section 2.2. 
+モデルは現実的な画像を生成できるか？訓練されたモデルは、第2.2節で述べた我々のマッピングアプローチによって発見された潜在表現zからのサンプリングによって条件付けされた、現実的に見える医療画像（図3の2行目）を生成します。
+
+In the case of normal image patches (see first and second block in Figure 3), our model is able to generate images that are visually similar to the query images (first row in Figure 3). 
+正常な画像パッチの場合（図3の1番目と2番目のブロックを参照）、我々のモデルはクエリ画像と視覚的に類似した画像を生成することができます（図3の1行目）。
+
+But in the case of anomalous images, the pairs of input images and generated images show obvious intensity or textural differences (see third block in Figure 3). 
+しかし、異常画像の場合には、入力画像と生成された画像のペアは、明らかな強度またはテクスチャの違いを示す（図３の３番目のブロックを参照）。
+
+The t-SNE embedding (Figure 2(b)) of normal and anomalous images in the feature representation of the last convolution layer of the discriminator that is utilized in the discrimination loss, illustrates the usability of the discriminator’s features for anomaly detection and suggests that our AnoGAN learns a meaningful manifold of normal anatomical variability.
+識別損失に利用される識別器の最後の畳み込み層の特徴表現における正常画像と異常画像のt-SNE埋め込み（図2(b)）は、異常検出のための識別器の特徴の有用性を示しており、我々のAnoGANが正常な解剖学的変動の意味のある多様性を学習することを示唆している。
+
+
+
+Fig. 4. 
+
+Image level anomaly detection performance and suitability evaluation. 
+画像レベルの異常検出性能と適性評価 
+
+(a)
+Model comparison: ROC curves based on aCAE (blue), GANR (red), the proposed AnoGAN (black), or on the output PD of the trained discriminator (green). 
+モデル比較。aCAE（青）、GANR（赤）、提案されたAnoGAN（黒）、または訓練された識別器の出力PD（緑）に基づくROC曲線。
+
+(b)
+Anomaly score components: ROC curves based on the residual score R(x) (green), the discrimination score D(x) (black), or the reference discrimination score ˆD(x) (red).
+異常スコアの成分。残差スコアR(x) (緑)、弁別スコアD(x) (黒)、または基準弁別スコアˆD(x) (赤)に基づくROC曲線。
+
+(c) Distribution of the residual score and (d) of the discrimination score, evaluated on normal images of the training set (blue) or test set (green), and on images extracted from diseased cases (red).
+(c) トレーニングセット(青)またはテストセット(緑)の正常画像と、疾患例から抽出した画像(赤)で評価した残差スコアと弁別スコアの(d)の分布。
+
+
+
+
+
+
+Can the model detect anomalies? Figure 4(b) shows the ROC curves for image level anomaly detection based on the anomaly score A(x), or on one of both components, on the residual score R(x), or on the discrimination score D(x).
+モデルは異常を検出できるか？図4(b)は、異常スコアA(x)、または両方の成分のうちの1つ、残差スコアR(x)、または識別スコアD(x)に基づく画像レベルの異常検出のROC曲線を示しています。
+
+The corresponding area under the ROC curve (AUC) is specified in parentheses. 
+対応するROC曲線下面積(AUC)は括弧内に明記されている。
+
+In addition, the distributions of the residual score R(x) (Figure 4(c)) and of the discrimination score D(x) (Figure 4(d)) over normal images from the training set and test set or over images extracted from diseased cases show that both components of the proposed adversarial score are suitable for the classification of normal and anomalous samples. 
+さらに、トレーニングセットとテストセットからの正常画像、または病気の症例から抽出された画像に対する残差スコアR(x)（図4(c)）と弁別スコアD(x)（図4(d)）の分布は、提案された敵対スコアの両方の成分が正常サンプルと異常サンプルの分類に適していることを示している。
+
+Figure 3 shows pixel-level identification of anomalies in conjunction with pixel-level annotations of retinal fluid, which demonstrate high accuracy. 
+図３は、網膜液のピクセルレベルのアノテーションと組み合わせた異常のピクセルレベルの識別を示しており、高い精度を示している。
+
+Last column in Figure 3 demonstrates that the model successfully identifies additional retinal lesions, which in this case correspond to hyperreflective foci (HRF). 
+図3の最後の列は、モデルが追加の網膜病変を識別することに成功したことを示していますが、この場合は反射亢進病巣（HRF）に対応しています。
+
+On image level, the red and yellow bars in Figure 3 demonstrate that our model successfully identifies every example image from diseased cases of the test set as beeing anomalous based on the residual score and the discrimination score, respectively.
+画像レベルでは、図3の赤と黄色のバーは、それぞれ残差スコアと弁別スコアに基づいて、テストセットの病変例のすべての画像を異常画像として識別することに成功していることを示しています。
+
+How does the model compare to other approaches? We evaluated the anomaly detection performance of the GANR, the aCAE and the AnoGAN on image-level labels. 
+このモデルは他のアプローチと比較してどうでしょうか？画像レベルのラベルについて、GANR、aCAE、AnoGANの異常検出性能を評価しました。
+
+The results are summarized in Table 1 and the corresponding ROC curves are shown in Figure 4(a). 
+結果を表1にまとめ、対応するROC曲線を図4(a)に示します。
+
+Although aCAEs simultaneously yield a generative model and a direct mapping to the latent space, which is advantageous in terms of runtimes during testing, this model showed worse performance on the anomaly detection task compared to the AnoGAN. 
+aCAE は生成モデルと潜在空間への直接マッピングを同時に行うため、テスト時のランタイムの点で有利であるが、このモデルは AnoGAN と比較して異常検出タスクでの性能が悪いことがわかった。
+
+It turned out that aCAEs tend to over-adapt on anomalous images. 
+ACAEは異常画像に過剰適応する傾向があることがわかりました。
+
+Figure 4(b) demonstrates that anomaly detection based on our proposed discrimination score D(x) outperforms the reference discrimination score ˆD(x).
+図4(b)は、提案した弁別スコアD(x)に基づく異常検出が基準弁別スコアˆD(x)よりも優れていることを示しています。
+
+Because the scores for the detection of anomalies are directly related to the losses for the mapping to latent space, these results give evidence that our proposed discrimination loss LD(z) is advantageous compared to the discrimination loss LˆD(z). 
+異常検出のスコアは潜在空間へのマッピングの損失に直接関連しているため、これらの結果は、我々の提案する弁別損失LD(z)が弁別損失LˆD(z)と比較して有利であることを示しています。
+
+Nevertheless, according to the AUC, computed based on the anomaly score, the AnoGAN and the GANR show comparable results (Figure 4(a)). 
+しかし、アノマリースコアに基づいて計算されたAUCによると、AnoGANとGANRは同等の結果を示しています（図4(a)）。
+
+This has to be attributed to the good performance of the residual score R(x). 
+これは残差スコアR(x)の性能が良いためと考えられます。
+
+A good anomaly detection performance (cf. PD in Figure 4(a) and Table 1) can be obtained when the mapping to the latent space is skipped and a binary decision is derived from the discriminator output, conditioned directly on the query image.
+潜在空間へのマッピングをスキップし、クエリ画像に直接条件を付けて判別器出力から二値決定を導出すると、良好な異常検出性能（図4(a)のPDと表1参照）が得られます。
+
+
+
+
+
+
+
+
+
+
+
+4
+Conclusion
+
+We propose anomaly detection based on deep generative adversarial networks.
+本研究では、深層生成的逆説ネットワークを用いた異常検出法を提案する。
+
+By concurrently training a generative model and a discriminator, we enable the identification of anomalies on unseen data based on unsupervised training of a model on healthy data. 
+生成モデルと識別器を同時に学習させることで、健全なデータに対して教師なしでモデルを学習させることで、目に見えないデータ上の異常を識別することが可能となる。
+
+Results show that our approach is able to detect different known anomalies, such as retinal fluid and HRF, which have never been seen during training. 
+その結果、我々のアプローチは、網膜液やHRFのような、学習中には見られなかった既知の異なる異常を検出できることを示した。
+
+Therefore, the model is expected to be capable to discover novel anomalies. 
+したがって、このモデルは新たな異常を発見することができると期待される。
+
+While quantitative evaluation based on a subset of anomaly classes is limited, since false positives do not take novel anomalies into account, results demonstrate good sensitivity and the capability to segment anomalies. 
+異常クラスのサブセットを用いた定量的な評価には限界があるが、偽陽性は新規異常を考慮していないため、良好な感度と異常のセグメント化が可能であることが示された。
+
+Discovering anomalies at scale enables the mining of data for marker candidates subject to future verification. 
+このような異常を大規模に発見することで、将来の検証対象となるマーカー候補のデータをマイニングすることが可能となる。
+
+In contrast to prior work, we show that the utilization of the residual loss alone yields good results for the mapping from image to latent space, and a slight improvement of the results can be achieved with the proposed adaptations.
+これまでの研究とは対照的に、残差損失の利用のみで画像から潜在空間へのマッピングに良好な結果が得られることを示し、提案された適応策を用いることで結果が若干改善されることを示した。
+
+
+
+
+
+
+
+
+Table 1. 
+
+Clinical performance statistics calculated at the Youden’s index of the ROC curve and the corresponding AUC based on the adversarial score A(x) of our model (AnoGAN ) and of the aCAE, based on the reference adversarial score ˆA(x) utilized by GANR, or based directly on the output of the DCGAN (PD).
+我々のモデル（AnoGAN ）とaCAEの敵対スコアA(x)に基づいたROC曲線のユーデン指数と対応するAUC、GANRによって利用された参照敵対スコアˆA(x)に基づいたもの、またはDCGAN（PD）の出力に直接基づいて計算された臨床パフォーマンスの統計。
+
+
+
+
+
+
+
+
+
+
+
+

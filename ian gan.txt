@@ -1,0 +1,409 @@
+
+
+
+Generative Adversarial Nets
+
+
+
+Abstract
+
+We propose a new framework for estimating generative models via an adversarial process, in which we simultaneously train two models: a generative model G that captures the data distribution, and a discriminative model D that estimates the probability that a sample came from the training data rather than G. 
+ここでは、2つのモデルを同時に訓練する：データ分布を捉える生成モデルGと、サンプルがGではなく訓練データから来た確率を推定する識別モデルDである。
+
+The training procedure for G is to maximize the probability of D making a mistake. 
+Gの訓練手順は、Dが間違いを犯す確率を最大化することです。
+
+This framework corresponds to a minimax two-player game. In the space of arbitrary functions G and D, a unique solution exists, with G recovering the training data distribution and D equal to 12 everywhere. 
+このフレームワークは、ミニマックス二人用ゲームに相当する。任意の関数GとDの空間では、Gが訓練データの分布を回復し、Dがどこでも12に等しくなるようなユニークな解が存在する。
+
+In the case where G and D are defined by multilayer perceptrons, the entire system can be trained with backpropagation.
+GとDが多層パーセプトロンで定義されている場合，システム全体をバックプロパゲーションで学習することができます．
+
+There is no need for any Markov chains or unrolled approximate inference networks during either training or generation of samples. 
+訓練中もサンプル生成中もマルコフ連鎖やアンロールされた近似推論ネットワークは必要ありません。
+
+Experiments demonstrate the potential of the framework through qualitative and quantitative evaluation of the generated samples.
+実験は生成されたサンプルの質的・量的評価を通してフレームワークの可能性を実証する。
+
+
+
+
+
+
+1
+Introduction
+
+The promise of deep learning is to discover rich, hierarchical models [2] that represent probability distributions over the kinds of data encountered in artificial intelligence applications, such as natural images, audio waveforms containing speech, and symbols in natural language corpora. 
+ディープラーニングの有望な点は、自然画像、音声を含む音声波形、自然言語コーパスの記号など、人工知能アプリケーションで遭遇する種類のデータ上の確率分布を表現する、リッチで階層的なモデル[2]を発見することである。
+
+So far, the most striking successes in deep learning have involved discriminative models, usually those that map a high-dimensional, rich sensory input to a class label [14, 22]. 
+これまでのところ、ディープラーニングで最も顕著な成功を収めているのは、識別モデルであり、通常は高次元で豊かな感覚入力をクラスラベルにマッピングするモデルである [14, 22]。
+
+These striking successes have primarily been based on the backpropagation and dropout algorithms, using piecewise linear units [19, 9, 10] which have a particularly well-behaved gradient . 
+これらの顕著な成功は、主にバックプロパゲーションとドロップアウトアルゴリズムに基づいており、特に良好な勾配を持つピースワイズ線形単位[19, 9, 10]を使用しています。
+
+Deep generative models have had less of an impact, due to the difficulty of approximating many intractable probabilistic computations that arise in maximum likelihood estimation and related strategies, and due to difficulty of leveraging the benefits of piecewise linear units in the generative context. We propose a new generative model estimation procedure that sidesteps these difficulties. 1
+最尤推定や関連戦略で発生する多くの難解な確率計算を近似することが困難であることと、生成的文脈でピースワイズ線形単位の利点を活用することが困難であることから、ディープな生成モデルはあまりインパクトがありませんでした。我々は、これらの困難を回避する新しい生成モデル推定手順を提案する。1
+
+In the proposed adversarial nets framework, the generative model is pitted against an adversary: a discriminative model that learns to determine whether a sample is from the model distribution or the data distribution. 
+提案された敵対的ネットのフレームワークでは、生成モデルは敵対者と対戦します：サンプルがモデル分布かデータ分布かを決定するために学習する識別モデルです。
+
+The generative model can be thought of as analogous to a team of counterfeiters, trying to produce fake currency and use it without detection, while the discriminative model is analogous to the police, trying to detect the counterfeit currency. 
+生成モデルは、偽造通貨を製造して検出されずにそれを使用しようとする偽造者のチームに例えられると考えることができますが、識別モデルは偽造通貨を検出しようとする警察に例えられます。
+
+Competition in this game drives both teams to improve their methods until the counterfeits are indistiguishable from the genuine articles.
+このゲームでの競争は、偽造品が本物と区別がつかなくなるまで、両チームの方法を改善することを促します。
+
+This framework can yield specific training algorithms for many kinds of model and optimization algorithm. 
+このフレームワークは、多くの種類のモデルや最適化アルゴリズムのための特定の学習アルゴリズムをもたらすことができる。
+
+In this article, we explore the special case when the generative model generates samples by passing random noise through a multilayer perceptron, and the discriminative model is also a multilayer perceptron. 
+本論文では、生成モデルが多層パーセプトロンにランダムノイズを通過させてサンプルを生成し、識別モデルも多層パーセプトロンである場合の特殊なケースを探求する。
+
+We refer to this special case as adversarial nets. 
+この特殊なケースを逆境ネットと呼ぶことにする。
+
+In this case, we can train both models using only the highly successful backpropagation and dropout algorithms [17] and sample from the generative model using only forward propagation. 
+この場合、非常に成功したバックプロパゲーションとドロップアウトアルゴリズム[17]のみを用いて両方のモデルを訓練し、前方伝播のみを用いて生成モデルからサンプルを抽出することができる。
+
+No approximate inference or Markov chains are necessary.
+近似推論やマルコフ連鎖は必要ない。
+
+
+2
+Related work
+
+An alternative to directed graphical models with latent variables are undirected graphical models with latent variables, such as restricted Boltzmann machines (RBMs) [27, 16], deep Boltzmann machines (DBMs) [26] and their numerous variants.
+潜在変数を持つ有向グラフィカル・モデルの代替として、制限ボルツマン・マシン（RBM）[27, 16]、ディープ・ボルツマン・マシン（DBM）[26]およびそれらの多数の変種のような潜在変数を持つ無向グラフィカル・モデルがある。
+
+The interactions within such models are represented as the product of unnormalized potential functions, normalized by a global summation/integration over all states of the random variables. 
+このようなモデル内の相互作用は、正規化されていないポテンシャル関数の積として表現され、ランダム変数のすべての状態にわたってグローバルな和/統合によって正規化されます。
+
+This quantity (the partition function) and its gradient are intractable for all but the most trivial instances, although they can be estimated by Markov chain Monte Carlo (MCMC) methods. 
+この量（分割関数）とその勾配は、マルコフ連鎖モンテカルロ法（MCMC）によって推定することができますが、最も些細な場合を除いて、すべての場合で難解です。
+
+Mixing poses a significant problem for learning algorithms that rely on MCMC [3, 5].
+混合はMCMCに依存する学習アルゴリズムにとって重要な問題である [3, 5]。
+
+Deep belief networks (DBNs) [16] are hybrid models containing a single undirected layer and several directed layers. 
+ディープビリーフネットワーク(DBN) [16]は、単一の無向層と複数の有向層を含むハイブリッドモデルである。
+
+While a fast approximate layer-wise training criterion exists, DBNs incur the computational difficulties associated with both undirected and directed models.
+層ごとの高速な近似学習基準は存在するが、DBNは無指向モデルと有向モデルの両方に関連した計算上の困難さを伴う。
+
+Alternative criteria that do not approximate or bound the log-likelihood have also been proposed, such as score matching [18] and noise-contrastive estimation (NCE) [13]. 
+対数尤度を近似したり拘束したりしない代替基準も提案されており、スコアマッチング[18]や雑音対照推定(NCE) [13]などがある。
+
+Both of these require the learned probability density to be analytically specified up to a normalization constant. 
+これらはいずれも、学習された確率密度が正規化定数まで解析的に指定されることを必要とする。
+
+Note that in many interesting generative models with several layers of latent variables (such as DBNs and DBMs), it is not even possible to derive a tractable unnormalized probability density. 
+数層の潜在変数を持つ多くの興味深い生成モデル（DBNやDBMなど）では、扱いやすい正規化されていない確率密度を導出することさえ不可能であることに注意してください。
+
+Some models such as denoising auto-encoders [30] and contractive autoencoders have learning rules very similar to score matching applied to RBMs. 
+非正規化オートエンコーダー[30]や縮退オートエンコーダーのようないくつかのモデルは、RBMに適用されるスコアマッチングに非常に類似した学習規則を持っている。
+
+In NCE, as in this work, a discriminative training criterion is employed to fit a generative model. 
+NCEでは、本研究と同様に、生成モデルを適合させるために識別的な学習基準が採用されている。
+
+However, rather than fitting a separate discriminative model, the generative model itself is used to discriminate generated data from samples a fixed noise distribution.
+しかし、別個の識別モデルを適合させるのではなく、生成モデル自体が、生成されたデータを固定ノイズ分布のサンプルから識別するために使用されます。
+
+Because NCE uses a fixed noise distribution, learning slows dramatically after the model has learned even an approximately correct distribution over a small subset of the observed variables.
+NCEは固定ノイズ分布を使用するため、モデルが観測された変数の小さなサブセットにわたってほぼ正しい分布さえ学習した後では、学習は劇的に遅くなります。
+
+Finally, some techniques do not involve defining a probability distribution explicitly, but rather train a generative machine to draw samples from the desired distribution. 
+最後に、いくつかの手法では、確率分布を明示的に定義するのではなく、希望する分布からサンプルを抽出するために生成マシンを訓練します。
+
+This approach has the advantage that such machines can be designed to be trained by back-propagation. 
+このアプローチには、バックプロパゲーションによって機械を訓練するように設計できるという利点があります。
+
+Prominent recent work in this area includes the generative stochastic network (GSN) framework [5], which extends generalized denoising auto-encoders [4]: both can be seen as defining a parameterized Markov chain, i.e., one learns the parameters of a machine that performs one step of a generative Markov chain. 
+この分野での最近の顕著な研究には、一般化されたノイズ除去自動エンコーダ[4]を拡張した生成確率ネットワーク(GSN)フレームワーク[5]があります：両方ともパラメータ化されたマルコフ連鎖を定義していると見ることができます。
+
+Compared to GSNs, the adversarial nets framework does not require a Markov chain for sampling. 
+GSNと比較して、逆境ネットのフレームワークはサンプリングにマルコフ連鎖を必要としない。
+
+Because adversarial nets do not require feedback loops during generation, they are better able to leverage piecewise linear units [19, 9, 10], which improve the performance of backpropagation but have problems with unbounded activation when used ina feedback loop. 
+アドバーサリアル・ネットは生成中にフィードバック・ループを必要としないので、ピースワイズ線形単位を活用することができる[19, 9, 10]が、バックプロパゲーションの性能を向上させるが、フィードバック・ループで使用される場合には束縛されない活性化の問題がある。
+
+More recent examples of training a generative machine by back-propagating into it include recent work on auto-encoding variational Bayes [20] and stochastic backpropagation [24].
+バックプロパゲーションによって生成マシンを学習する最近の例としては、変分ベイズの自動エンコード[20]や確率的バックプロパゲーション[24]などがあります。
+
+
+3
+Adversarial nets
+
+
+The adversarial modeling framework is most straightforward to apply when the models are both multilayer perceptrons. 
+アドバーサリアル・モデリングのフレームワークは、モデルが両方とも多層パーセプトロンである場合に適用するのが最も簡単です。
+
+To learn the generator’s distribution pg over data x, we define a prior on input noise variables pz(z), then represent a mapping to data space as G(z; θg), where G is a differentiable function represented by a multilayer perceptron with parameters θg. 
+データx上の生成器の分布pgを学習するために、入力ノイズ変数pz(z)に対する事前定義を定義し、データ空間へのマッピングをG(z; θg)として表現します。
+
+We also define a second multilayer perceptron D(x; θd) that outputs a single scalar. 
+また、1つのスカラーを出力する第2の多層パーセプトロンD(x; θd)を定義する。
+
+D(x) represents the probability that x came from the data rather than pg. 
+D(x)はpgではなくxがデータから来た確率を表します。
+
+We train D to maximize the probability of assigning the correct label to both training examples and samples from G. We simultaneously train G to minimize log(1 − D(G(z))):
+我々は、訓練例とGからのサンプルの両方に正しいラベルを割り当てる確率が最大になるようにDを訓練します。
+
+In other words, D and G play the following two-player minimax game with value function V (G, D):
+言い換えれば、D と G は、値関数 V (G, D) を用いて、次のような 2 プレイヤーミニマックスゲームを行う。
+
+
+
+
+
+In the next section, we present a theoretical analysis of adversarial nets, essentially showing that the training criterion allows one to recover the data generating distribution as G and D are given enough capacity, i.e., in the non-parametric limit. 
+次のセクションでは、我々は敵対ネットの理論的分析を提示します。本質的に、GとDが十分な容量を与えられたとき、すなわちノンパラメトリック限界では、訓練基準によってデータ生成分布を回復することができることを示します。
+
+See Figure 1 for a less formal, more pedagogical explanation of the approach. 
+このアプローチのより正式ではない、より教育的な説明については、図1を参照してください。
+
+In practice, we must implement the game using an iterative, numerical approach. 
+実際には，反復的な数値的アプローチを用いてゲームを実装しなければなりません．
+
+Optimizing D to completion in the inner loop of training is computationally prohibitive, and on finite datasets would result in overfitting. 
+訓練の内側のループでDを完成まで最適化するのは計算量が多く、有限のデータセットではオーバーフィットになります。
+
+Instead, we alternate between k steps of optimizing D and one step of optimizing G. 
+その代わりに、Dを最適化するkステップとGを最適化する1ステップを交互に行います。
+
+This results in D being maintained near its optimal solution, so long as G changes slowly enough. 
+これにより，Gが十分にゆっくりと変化する限り，Dは最適解に近い状態に維持されます．
+
+This strategy is analogous to the way that SML/PCD [31, 29] training maintains samples from a Markov chain from one learning step to the next in order to avoid burning in a Markov chain as part of the inner loop of learning. 
+この戦略は、SML/PCD [31, 29]の学習が、学習の内部ループの一部としてマルコフ連鎖での燃焼を避けるために、 マルコフ連鎖のサンプルを学習ステップから次のステップまで維持する方法と類似しています。
+
+The procedure is formally presented in Algorithm 1.
+その手順は，正式にはアルゴリズム1に示されています．
+
+In practice, equation 1 may not provide sufficient gradient for G to learn well. 
+実際には、式１は、Ｇが良好に学習するのに十分な勾配を提供しない場合がある。
+
+Early in learning, when G is poor, D can reject samples with high confidence because they are clearly different from the training data. 
+学習の初期段階では、Gが貧弱な場合、訓練データとは明らかに異なるため、Dは高い信頼性でサンプルを拒絶することができます。
+
+In this case, log(1 − D(G(z))) saturates. 
+この場合、log(1 - D(G(z)))は飽和する。
+
+Rather than training G to minimize log(1 − D(G(z))) we can train G to maximize log D(G(z)). 
+log(1 - D(G(z)))を最小化するようにGを訓練するのではなく、log D(G(z))を最大化するようにGを訓練することができます。
+
+This objective function results in the same fixed point of the dynamics of G and D but provides much stronger gradients early in learning.
+この目的関数は、GとDのダイナミクスの定点を同じにしますが、学習の初期段階でははるかに強い勾配を提供します。
+
+
+
+
+
+Figure 1: 
+
+Generative adversarial nets are trained by simultaneously updating the discriminative distribution (D, blue, dashed line) so that it discriminates between samples from the data generating distribution (black, dotted line) px from those of the generative distribution pg (G) (green, solid line). 
+生成的敵対ネットは，データ生成分布（黒，点線）pxからのサンプルと生成分布pg（G）（緑，実線）からのサンプルの間を識別するように，識別分布（D，青，破線）を同時に更新することによって学習されます．
+
+The lower horizontal line is the domain from which z is sampled, in this case uniformly.
+下の水平線は、zがサンプリングされる領域（この場合は一様に）です。
+
+The horizontal line above is part of the domain of x. 
+上の水平線は、xの領域の一部です。
+
+The upward arrows show how the mapping x = G(z) imposes the non-uniform distribution pg on transformed samples. 
+上向きの矢印は、写像 x = G(z) が変換された標本にどのように不均一分布pgを課すかを示しています。
+
+G contracts in regions of high density and expands in regions of low density of pg. 
+Gは密度が高い領域では収縮し、pgの密度が低い領域では膨張します。
+
+(a)
+Consider an adversarial pair near convergence: pg is similar to pdata and D is a partially accurate classifier.
+収束に近い敵対対を考えてみましょう：pgはpdataに似ていて、Dは部分的に正確な分類器です。
+
+(b) 
+In the inner loop of the algorithm D is trained to discriminate samples from data, converging to D∗(x) = pdata(x) pdata(x)+pg(x). 
+アルゴリズムの内側のループでは、Dはデータからサンプルを識別するために訓練され、D∗(x) = pdata(x) pdata(x)+pg(x)に収束する。
+
+(c) 
+After an update to G, gradient of D has guided G(z) to flow to regions that are more likely to be classified as data. 
+Ｇへの更新後、Ｄの勾配は、Ｇ（ｚ）がデータとして分類される可能性が高い領域に流れるようにＧ（ｚ）を誘導している。
+
+(d) 
+After several steps of training, if G and D have enough capacity, they will reach a point at which both cannot improve because pg = pdata. 
+数段階のトレーニングを経て、GとDが十分な能力を持っていれば、pg＝pdataなので、両者ともに改善できない地点に到達します。
+
+The discriminator is unable to differentiate between the two distributions, i.e. D(x) = 12.
+識別器は2つの分布、すなわちD(x)=12を区別することができません。
+
+
+
+
+
+
+
+4
+Theoretical Results
+
+The generator G implicitly defines a probability distribution pg as the distribution of the samples G(z) obtained when z ∼ pz. 
+生成器 G は、z ∼ pz のときに得られるサンプル G(z) の分布として確率分布 pg を暗黙的に定義します。
+
+Therefore, we would like Algorithm 1 to converge to a good estimator of pdata, if given enough capacity and training time. 
+したがって、十分な容量と学習時間が与えられていれば、アルゴリズム1がpdataの良い推定値に収束することを期待します。
+
+The results of this section are done in a non-parametric setting, e.g. we represent a model with infinite capacity by studying convergence in the space of probability density functions.
+本節の結果はノンパラメトリックな設定で行われ、例えば、確率密度関数の空間での収束性を調べることで、無限大の容量を持つモデルを表現する。
+
+We will show in section 4.1 that this minimax game has a global optimum for pg = pdata. 
+4.1節では、このミニマックスゲームがpg = pdataに対して大域的な最適値を持つことを示します。
+
+We will then show in section 4.2 that Algorithm 1 optimizes Eq 1, thus obtaining the desired result.
+そして、4.2節では、アルゴリズム1が式1を最適化し、所望の結果を得ることを示します。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+数式多いので省略
+
+
+
+
+
+
+
+
+
+5
+Experiments
+
+We trained adversarial nets an a range of datasets including MNIST[23], the Toronto Face Database (TFD) [28], and CIFAR-10 [21]. 
+我々はMNIST[23]、トロント顔データベース(TFD) [28]、CIFAR-10[21]を含む様々なデータセットを用いて敵対ネットを訓練した。
+
+The generator nets used a mixture of rectifier linear activations [19,9] and sigmoid activations, while the discriminator net used maxout [10] activations. 
+生成ネットは整流器線形活性 [19,9] とシグモイド活性を混合したものを使用し，判別ネットはmaxout [10]活性を使用した．
+
+Dropout [17] was applied in training the discriminator net. 
+識別ネットの訓練には、ドロップアウト [17] が適用された。
+
+While our theoretical framework permits the use of dropout and other noise at intermediate layers of the generator, we used noise as the input to only the bottommost layer of the generator network.
+我々の理論的枠組みでは、生成器の中間層でドロップアウトや他のノイズを使用することができるが、我々は生成器ネットワークの最下層のみへの入力としてノイズを使用した。
+
+We estimate probability of the test set data under pg by fitting a Gaussian Parzen window to the samples generated with G and reporting the log-likelihood under this distribution. 
+我々は、Gで生成されたサンプルにガウスのパルゼン窓を当てはめ、この分布の下での対数尤度を報告することで、pgの下でのテストセットのデータの確率を推定します。
+
+The σ parameter of the Gaussians was obtained by cross validation on the validation set. 
+ガウス分布のσパラメータは、検証集合のクロスバリデーションによって得られました。
+
+This procedure was introduced in Breuleux et al. [8] and used for various generative models for which the exact likelihood is not tractable [25, 3, 5]. 
+この手順は、Breuleuxら[8]で導入され、厳密尤度が困難なさまざまな生成モデルに使用されました[25, 3, 5]。
+
+Results are reported in Table 1. 
+結果を表1に報告する。
+
+This method of estimating the likelihood has somewhat high variance and does not perform well in high dimensional spaces but it is the best method available to our knowledge. 
+この尤度を推定する方法は、やや分散が高く、高次元空間ではうまく機能しないが、我々の知る限りでは最良の方法である。
+
+Advances in generative models that can sample but not estimate likelihood directly motivate further research into how to evaluate such models.
+サンプリングはできるが尤度は推定できない生成モデルの進歩は、そのようなモデルを評価する方法についての研究をさらに進める動機付けとなっています。
+
+In Figures 2 and 3 we show samples drawn from the generator net after training. 
+図2と3では、学習後の生成ネットから引き出されたサンプルを示しています。
+
+While we make no claim that these samples are better than samples generated by existing methods, we believe that these samples are at least competitive with the better generative models in the literature and highlight the potential of the adversarial framework.
+これらのサンプルが既存の方法で生成されたサンプルよりも優れているとは主張しませんが、これらのサンプルは少なくとも文献のより優れた生成モデルと競合すると信じており、敵対的フレームワークの可能性を強調しています。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+6
+Advantages and disadvantages
+メリットとデメリット
+
+This new framework comes with advantages and disadvantages relative to previous modeling frameworks. 
+この新しいフレームワークは、以前のモデリングフレームワークと比較して長所と短所があります。
+
+The disadvantages are primarily that there is no explicit representation of pg(x), and that D must be synchronized well with G during training (in particular, G must not be trained too much without updating D, in order to avoid “the Helvetica scenario” in which G collapses too many values of z to the same value of x to have enough diversity to model pdata), much as the negative chains of a Boltzmann machine must be kept up to date between learning steps. 
+不利な点は、主にpg(x)の明示的な表現がないこと、学習中にDがGとよく同期していなければならないことです（特に、Gがpdataをモデル化するのに十分な多様性を持つためにzの値が多すぎてxの同じ値に崩れてしまう "Helveticaシナリオ "を避けるために、Dを更新せずにGをあまり多く学習させてはいけません）。
+
+The advantages are that Markov chains are never needed, only backprop is used to obtain gradients, no inference is needed during learning, and a wide variety of functions can be incorporated into the model. 
+利点は、マルコフ連鎖が不要であること、勾配を得るためにバックプロップのみが使用されること、学習中に推論が不要であること、モデルに多種多様な関数を組み込むことができることです。
+
+Table 2 summarizes the comparison of generative adversarial nets with other generative modeling approaches.
+表2は、他の生成的モデル化アプローチとの比較をまとめたものである。
+
+The aforementioned advantages are primarily computational. Adversarial models may also gain some statistical advantage from the generator network not being updated directly with data examples, but only with gradients flowing through the discriminator. 
+前述の利点は主に計算上のものである。また、敵対モデルは、生成器ネットワークがデータ例で直接更新されるのではなく、判別器を流れる勾配のみで更新されることから、統計的な利点を得ることができます。
+
+This means that components of the　input are not copied directly into the generator’s parameters. 
+Another advantage of adversarial networks is that they can represent very sharp, even degenerate distributions, while methods based on　Markov chains require that the distribution be somewhat blurry in order for the chains to be able to　mix between modes.
+これは、入力の構成要素がジェネレータのパラメータに直接コピーされないことを意味します。
+マルコフ連鎖に基づく手法では、連鎖がモード間で混在できるようにするためには、分布が多少ぼやけている必要があるのに対し、逆境ネットワークのもう一つの利点は、非常にシャープな、退化した分布でさえも表現できることである。
+
+
+
+
+
+7
+Conclusions and future work
+
+
+This framework admits many straightforward extensions:
+このフレームワークは、多くの簡単な拡張を認めています。
+
+1. A conditional generative model p(x | c) can be obtained by adding c as input to both G and D.
+1. 1. 条件付き生成モデルp(x | c)は、GとDの両方にcを入力として加えることで得られる。
+
+2. Learned approximate inference can be performed by training an auxiliary network to predict z　given x. 
+2. 2. 学習された近似推論は、xが与えられたzを予測するための補助ネットワークを訓練することによって実行できる。
+
+This is similar to the inference net trained by the wake-sleep algorithm [15] but with　the advantage that the inference net may be trained for a fixed generator net after the generator　net has finished training.
+これは、ウェイクスリープ・アルゴリズム[15]で訓練された推論ネットに似ているが、推論ネットは、発電機ネットが訓練を終えた後、固定された発電機ネットに対して訓練されるという利点がある。
+
+3. One can approximately model all conditionals p(xS | x̸S) where S is a subset of the indices　of x by training a family of conditional models that share parameters. 
+3. 3. パラメータを共有する条件モデルのファミリーを学習することで、Sがxのインデックスのサブセットであるすべての条件式p(xS | x̸S)を近似的にモデル化することができる。
+
+Essentially, one can use　adversarial nets to implement a stochastic extension of the deterministic MP-DBM [11].
+本質的には、決定論的MP-DBM [11]の確率的拡張を実装するために、敵対ネットを使用することができる。
+
+4. Semi-supervised learning: features from the discriminator or inference net could improve performance of classifiers when limited labeled data is available.
+4. 4. 半教師付き学習：限られたラベル付けデータが利用可能な場合、識別器や推論ネットからの特徴を利用することで、分類器の性能を向上させることができる。
+
+5. Efficiency improvements: training could be accelerated greatly by divising better methods for　coordinating G and D or determining better distributions to sample z from during training.
+5. 5. 効率の向上: G と D を協調させるためのより良い方法を分割したり、訓練中に z を標本化するためのより良い分布を決定したりすることで、訓練を大幅に加速させることができる。
+
+This paper has demonstrated the viability of the adversarial modeling framework, suggesting that　these research directions could prove useful.
+この論文は、敵対的モデル化フレームワークの実行可能性を実証し、これらの研究の方向性が有用であることを示唆している。
+
+
+
+
+

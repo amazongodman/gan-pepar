@@ -1,0 +1,771 @@
+
+UNSUPERVISED REPRESENTATION LEARNING WITH DEEP CONVOLUTIONAL GENERATIVE ADVERSARIAL NETWORKS
+深い革命的ジェネレーティブ逆説的ネットワークを用いた非監視下での表現学習
+
+
+
+
+abst
+
+In recent years, supervised learning with convolutional networks (CNNs) has seen huge adoption in computer vision applications. 
+近年、畳み込みネットワーク(CNN)を用いた教師付き学習は、コンピュータビジョンのアプリケーションで大規模に採用されています。
+
+Comparatively, unsupervised learning with CNNs has received less attention. 
+比較的、CNNを用いた教師なし学習はあまり注目されていない。
+
+In this work we hope to help bridge the gap between the success of CNNs for supervised learning and unsupervised learning. 
+この作業では、教師あり学習のためのCNNの成功と教師なし学習の間のギャップを埋めるのに役立つことを期待しています。
+
+We introduce a class of CNNs called deep convolutional generative adversarial networks (DCGANs), that have certain architectural constraints, and demonstrate that they are a strong candidate for unsupervised learning. 
+本研究では、ある種のアーキテクチャ上の制約を持つ、深層畳み込み生成的逆境ネットワーク(DCGAN)と呼ばれるCNNのクラスを紹介し、教師なし学習の有力な候補であることを実証する。
+
+Training on various image datasets, we show convincing evidence that our deep convolutional adversarial pair learns a hierarchy of representations from object parts to scenes in both the generator and discriminator. 
+様々な画像データセットを用いた学習により、生成器と識別器の両方において、物体部分からシーンまでの表現の階層を学習することを実証した。
+
+
+Additionally, we use the learned features for novel tasks - demonstrating their applicability as general image representations.
+さらに、学習した特徴量を新しいタスクに利用し、一般的な画像表現としての適用性を実証した。
+
+
+
+
+intr
+
+
+Learning reusable feature representations from large unlabeled datasets has been an area of active research. 
+大規模なラベルのないデータセットから再利用可能な特徴表現を学習することは、活発な研究分野となっています。
+
+In the context of computer vision, one can leverage the practically unlimited amount of unlabeled images and videos to learn good intermediate representations, which can then be used on a variety of supervised learning tasks such as image classification. 
+コンピュータビジョンの文脈では、ラベル付けされていない画像や動画を実質的に無制限に利用して、優れた中間表現を学習することができ、画像分類などの様々な教師付き学習タスクに利用することができます。
+
+We propose that one way to build good image representations is by training Generative Adversarial Networks (GANs) (Goodfellow et al., 2014), and later reusing parts of the generator and discriminator networks as feature extractors for supervised tasks. 
+我々は、良い画像表現を構築する一つの方法として、生成的逆境ネットワーク(GANs)を訓練し(Goodfellow et al., 2014)、後に生成器ネットワークと識別器ネットワークの一部を教師付きタスクのための特徴抽出器として再利用することを提案する。
+
+GANs provide an attractive alternative to maximum likelihood techniques.
+GANは最尤法に代わる魅力的な選択肢を提供します。
+
+One can additionally argue that their learning process and the lack of a heuristic cost function (such as pixel-wise independent mean-square error) are attractive to representation learning. 
+さらに、それらの学習プロセスとヒューリスティックなコスト関数（ピクセル単位の独立した平均二乗誤差など）の欠如は、表現学習にとって魅力的であると主張することができます。
+
+GANs have been known to be unstable to train, often resulting in generators that produce nonsensical outputs.
+GANは訓練が不安定であることが知られており、多くの場合、非論理的な出力を生成するジェネレータが発生します。
+
+There has been very limited published research in trying to understand and visualize what GANs learn, and the intermediate representations of multi-layer GANs.
+GANが何を学習するのかを理解し、可視化しようとする研究や、多層GANの中間的な表現については、非常に限られた研究が発表されています。
+
+In this paper, we make the following contributions
+本論文では、以下のような貢献をする。
+
+
+• We propose and evaluate a set of constraints on the architectural topology of Convolutional GANs that make them stable to train in most settings. We name this class of architectures Deep Convolutional GANs (DCGAN)
+- 我々は、コンボリューションGANのアーキテクチャトポロジーに関する一連の制約条件を提案し、評価する。我々は、このクラスのアーキテクチャをDeep Convolutional GANs (DCGAN)と呼ぶ。
+
+• We use the trained discriminators for image classification tasks, showing competitive performance with other unsupervised algorithms.
+- 本研究では、訓練された識別器を画像分類に用いることで、他の教師なしアルゴリズムと比較しても遜色のない性能を示した。
+
+• We visualize the filters learnt by GANs and empiricall show that specific filters have learned to draw specific objects.
+- GANによって学習されたフィルターを可視化し、特定のフィルターが特定の物体を描くことを学習したことを経験的に示しています。
+
+•  We show that the generators have interesting vector arithmetic properties allowing for easy manipulation of many semantic qualities of generated samples.
+- この生成器は、生成されたサンプルの多くの意味的品質を簡単に操作できるように、興味深いベクトル演算特性を持つことを示す。
+
+
+RELATED WORK
+
+
+REPRESENTATION LEARNING FROM UNLABELED DATA
+ラベル化されていないデータから学習する表現
+
+
+
+Unsupervised representation learning is a fairly well studied problem in general computer vision research, as well as in the context of images. 
+教師なし表現学習は、一般的なコンピュータビジョン研究においても、画像のコンテキストにおいても、かなりよく研究されている問題です。
+
+A classic approach to unsupervised representation learning is to do clustering on the data (for example using K-means), and leverage the clusters for improved classification scores. 
+教師なし表現学習の古典的なアプローチは、データ上でクラスタリングを行い（例えば、K-meansを使用）、分類スコアを向上させるためにクラスターを活用することです。
+
+In the context of images, one can do hierarchical clustering of image patches (Coates & Ng, 2012) to learn powerful image representations. 
+画像のコンテキストでは、強力な画像表現を学習するために、画像パッチの階層的クラスタリングを行うことができる(Coates & Ng, 2012)。
+
+Another popular method is to train auto-encoders (convolutionally, stacked (Vincent et al., 2010), separating the what and where components of the code (Zhao et al., 2015), ladder structures (Rasmus et al., 2015)) that encode an image into a compact code, and decode the code to reconstruct the image as accurately as possible. 
+別の一般的な方法としては、画像をコンパクトなコードにエンコードするオートエンコーダー（畳み込み的に、スタックされた（Vincentら、2010）、コードのwhatとwhereのコンポーネントを分離した（Zhaoら、2015）、ラダー構造（Rasmusら、2015））を訓練し、コードをデコードして画像を可能な限り正確に再構成することが挙げられる。
+
+These methods have also been shown to learn good feature representations from image pixels. 
+これらの方法は、画像の画素から良好な特徴表現を学習することも示されている。
+
+Deep belief networks (Lee et al., 2009) have also been shown to work well in learning hierarchical representations.
+ディープ・ビリーフ・ネットワーク(Lee et al., 2009)もまた、階層的表現の学習に有効であることが示されている。
+
+
+
+
+
+
+
+
+2.2
+GENERATING NATURAL IMAGES
+自然画像の生成
+
+Generative image models are well studied and fall into two categories: parametric and non-parametric.
+生成画像モデルはよく研究されており、パラメトリックとノンパラメトリックの2つのカテゴリーに分類されます。
+
+The non-parametric models often do matching from a database of existing images, often matching patches of images, and have been used in texture synthesis (Efros et al., 1999), super-resolution (Freeman et al., 2002) and in-painting (Hays & Efros, 2007).
+ノンパラメトリックモデルは、既存の画像のデータベースからマッチングを行うことが多く、画像のパッチをマッチングすることが多く、テクスチャ合成(Efros et al., 1999)、超解像(Freeman et al., 2002)、インペイント(Hays & Efros, 2007)で使用されてきました。
+
+Parametric models for generating images has been explored extensively (for example on MNIST digits or for texture synthesis (Portilla & Simoncelli, 2000)). 
+画像を生成するためのパラメトリックモデルは、広く研究されています（例えば、MNISTの桁数やテクスチャ合成（Portilla & Simoncelli, 2000）など）。
+
+However, generating natural images of the real world have had not much success until recently.
+しかし、現実世界の自然画像を生成することは、最近まであまり成功していませんでした。
+
+A variational sampling approach to generating images (Kingma & Welling, 2013) has had some success, but the samples often suffer from being blurry. 
+画像を生成するための変分サンプリングアプローチ（Kingma & Welling, 2013）はいくつかの成功を収めていますが、サンプルがぼやけてしまうことがよくあります。
+
+Another approach generates images using an iterative forward diffusion process (Sohl-Dickstein et al., 2015). 
+別のアプローチは、反復的な前方拡散プロセスを使用して画像を生成する（Sohl-Dicksteinら、2015）。
+
+Generative Adversarial Networks (Goodfellow et al., 2014) generated images suffering from being noisy and incomprehensible. 
+Generative Adversarial Networksは、ノイズが多くて理解しにくい画像を生成した。
+
+A laplacian pyramid extension to this approach (Denton et al., 2015) showed higher quality images, but they still suffered from the objects looking wobbly because of noise introduced in chaining multiple models. 
+このアプローチにラプラシアンピラミッドを拡張したもの(Denton et al., 2015)は、より高品質の画像を示しましたが、複数のモデルを連結する際に導入されたノイズのために、物体がグラグラして見えるという問題がありました。
+
+A recurrent network approach (Gregor et al., 2015) and a deconvolution network approach (Dosovitskiy et al., 2014) have also recently had some success with generating natural images. 
+リカレントネットワークアプローチ（Gregorら、2015）およびデコンボリューションネットワークアプローチ（Dosovitskiyら、2014）もまた、最近、自然画像の生成でいくつかの成功を収めている。
+
+However, they have not leveraged the generators for supervised tasks.
+しかし、彼らは教師付きタスクのためにジェネレーターを活用していない。
+
+
+
+
+
+
+
+
+2.3
+VISUALIZING THE INTERNALS OF CNNS
+CNNSの内部を可視化する
+
+One constant criticism of using neural networks has been that they are black-box methods, with little understanding of what the networks do in the form of a simple human-consumable algorithm. 
+ニューラルネットワークを使うことへの批判が絶えないのは、ネットワークが人間が消費するような単純なアルゴリズムの形で何をしているのかをほとんど理解していないブラックボックス的な手法であるということです。
+
+In the context of CNNs, Zeiler et. al. (Zeiler & Fergus, 2014) showed that by using deconvolutions and filtering the maximal activations, one can find the approximate purpose of each convolution filter in the network. 
+CNNの文脈では、Zeilerら（Zeiler & Fergus, 2014）は、デコンボリューションを用いて最大活性度をフィルタリングすることで、ネットワーク内の各畳み込みフィルタのおおよその目的を見出すことができることを示した。Zeiler & Fergus, 2014）は、デコンボリューションを用いて最大活性化をフィルタリングすることで、ネットワーク内の各畳み込みフィルタのおおよその目的を見出すことができることを示した。
+
+Similarly, using a gradient descent on the inputs lets us inspect the ideal image that activates certain subsets of filters (Mordvintsev et al.).
+同様に、入力上で勾配降下を使用すると、フィルタの特定のサブセットを活性化する理想的な画像を検査することができます (Mordvintsev et al.)。
+
+
+
+
+3
+APPROACH AND MODEL ARCHITECTURE
+アプローチとモデル建築
+
+
+Historical attempts to scale up GANs using CNNs to model images have been unsuccessful. 
+画像をモデル化するためにCNNを用いたGANのスケールアップの歴史的な試みは成功していない。
+
+This motivated the authors of LAPGAN (Denton et al., 2015) to develop an alternative approach to iteratively upscale low resolution generated images which can be modeled more reliably. 
+このことがLAPGAN (Denton et al., 2015)の著者たちの動機となり、より信頼性の高いモデル化が可能な低解像度の生成画像を反復的にアップスケールする代替的なアプローチを開発した。
+
+We also encountered difficulties attempting to scale GANs using CNN architectures commonly used in the supervised literature. 
+我々はまた、教師付き文献で一般的に使用されているCNNアーキテクチャを使用してGANをスケーリングしようとすると、困難に遭遇しました。
+
+However, after extensive model exploration we identified a family of architectures that resulted in stable training across a range of datasets and allowed for training higher resolution and deeper generative models.
+しかし、広範なモデル探索の結果、様々なデータセットにわたって安定した学習を実現し、より高解像度でより深い生成モデルの学習を可能にするアーキテクチャのファミリーを特定した。
+
+Core to our approach is adopting and modifying three recently demonstrated changes to CNN architectures.
+我々のアプローチの中核となるのは、最近実証された3つのCNNアーキテクチャの変更を採用し、修正することである。
+
+The first is the all convolutional net (Springenberg et al., 2014) which replaces deterministic spatial pooling functions (such as maxpooling) with strided convolutions, allowing the network to learn its own spatial downsampling. 
+第一は、決定論的な空間プーリング関数（maxpoolingなど）をストライド畳み込みに置き換え、ネットワークが独自の空間ダウンサンプリングを学習できるようにする、全畳み込みネット（Springenbergら、2014）である。
+
+We use this approach in our generator, allowing it to learn its own spatial upsampling, and discriminator.
+我々は、我々の生成器でこのアプローチを使用し、それがそれ自身の空間アップサンプリング、および識別器を学習することを可能にする。
+
+Second is the trend towards eliminating fully connected layers on top of convolutional features.
+第二に、畳み込み特徴の上に完全に接続された層を排除する傾向があります。
+
+The strongest example of this is global average pooling which has been utilized in state of the art image classification models (Mordvintsev et al.). 
+この最も強力な例は、最新の画像分類モデルで利用されているグローバル平均プーリングです(Mordvintsev et al.)。
+
+We found global average pooling increased model stability but hurt convergence speed. 
+我々は、グローバル平均プーリングがモデルの安定性を高めますが、収束速度に悪影響を与えることを発見しました。
+
+A middle ground of directly connecting the highest convolutional features to the input and output respectively of the generator and discriminator worked well. 
+最も高い畳み込み特徴を直接、生成器と識別器の入力と出力に接続するという中間的な方法がうまく機能しました。
+
+The first layer of the GAN, which takes a uniform noise distribution Z as input, could be called fully connected as it is just a matrix multiplication, but the result is reshaped into a 4-dimensional tensor and used as the start of the convolution stack. 
+一様なノイズ分布Zを入力とするGANの第1層は、単なる行列の乗算であるため完全に接続されていると言えるが、結果は4次元テンソルにリシェイプされ、畳み込みスタックの開始点として使用される。
+
+For the discriminator, the last convolution layer is flattened and then fed into a single sigmoid output. 
+判別器では、最後の畳み込み層が平坦化され、単一のシグモイド出力に供給されます。
+
+See Fig. 1 for a visualization of an example model architecture.
+モデル・アーキテクチャの例の可視化については、図1を参照してください。
+
+
+Third is Batch Normalization (Ioffe & Szegedy, 2015) which stabilizes learning by normalizing the input to each unit to have zero mean and unit variance. 
+3番目はバッチ正規化(Ioffe & Szegedy, 2015)で、各ユニットへの入力を正規化して平均値と単位分散がゼロになるようにすることで学習を安定化させる。
+
+This helps deal with training problems that arise due to poor initialization and helps gradient flow in deeper models. 
+これは、初期化が不十分なために発生する学習問題に対処するのに役立ち、より深いモデルでの勾配の流れを助けます。
+
+This proved critical to get deep generators to begin learning, preventing the generator from collapsing all samples to a single point which is a common failure mode observed in GANs. 
+これは、GANで観察される一般的な故障モードである、すべてのサンプルが一点に崩れてしまうことを防ぎ、ディープジェネレーターが学習を開始するために重要であることが証明されました。
+
+Directly applying batchnorm to all layers however, resulted in sample oscillation and model instability. 
+しかし、バッチノルムをすべての層に直接適用すると、サンプルが振動し、モデルが不安定になります。
+
+This was avoided by not applying batchnorm to the generator output layer and the discriminator input layer.
+これは、ジェネレータ出力層と判別器入力層にバッチノルムを適用しないことで回避されました。
+
+The ReLU activation (Nair & Hinton, 2010) is used in the generator with the exception of the output layer which uses the Tanh function. 
+Tanh関数を使用する出力層を除いて、ReLU活性化（Nair & Hinton, 2010）が生成器に使用されます。
+
+We observed that using a bounded activation allowed the model to learn more quickly to saturate and cover the color space of the training distribution. 
+我々は、制限された活性化を使用することで、モデルがより迅速に学習して、訓練分布の色空間を飽和させ、カバーすることができることを観察しました。
+
+Within the discriminator we found the leaky rectified activation (Maas et al., 2013) (Xu et al., 2015) to work well, especially for higher resolution modeling. 
+識別器の中では、リーキー整流活性化(Maas et al., 2013) (Xu et al., 2015)が、特に高解像度のモデリングでうまく機能することがわかりました。
+
+This is in contrast to the original GAN paper, which used the maxout activation (Goodfellow et al., 2013).
+これは、maxout活性化（Goodfellowら、2013）を使用したオリジナルのGAN論文とは対照的です。
+
+
+
+
+
+
+
+
+
+
+
+
+
+Architecture guidelines for stable Deep Convolutional GANs
+安定したDeep Convolutional GANのためのアーキテクチャガイドライン
+• Replace any pooling layers with strided convolutions (discriminator) and fractional-strided convolutions (generator).
+- すべてのプーリング レイヤーを、ストライド コンボリューション (判別器) とフラクショナル ストライド コンボリューション (生成器) で置き換えます。
+
+• Use batchnorm in both the generator and the discriminator.
+- ジェネレーターと判別器の両方でバッチノルムを使用します。
+
+• Remove fully connected hidden layers for deeper architectures.
+- より深いアーキテクチャーのために、完全に接続された隠れレイヤーを削除。
+
+• Use ReLU activation in generator for all layers except for the output, which uses Tanh.
+- Tanhを使用する出力を除くすべてのレイヤでジェネレータでReLU活性化を使用。
+
+• Use LeakyReLU activation in the discriminator for all layers.
+- すべてのレイヤで識別器でLeakyReLU活性化を使用。
+
+
+
+
+
+
+4
+DETAILS OF ADVERSARIAL TRAINING
+偏差値トレーニングの詳細
+
+We trained DCGANs on three datasets, Large-scale Scene Understanding (LSUN) (Yu et al., 2015), Imagenet-1k and a newly assembled Faces dataset. Details on the usage of each of these datasets are given below.
+我々は、Large-scale Scene Understanding (LSUN) (Yu et al., 2015)、Imagenet-1k、および新しく組み立てられたFacesデータセットの3つのデータセットに対してDCGANを学習させた。それぞれのデータセットの利用方法の詳細を以下に示す。
+
+No pre-processing was applied to training images besides scaling to the range of the tanh activation function [-1, 1]. 
+トレーニング画像には、tanh活性化関数[-1, 1]の範囲にスケーリングする以外に、前処理は行わなかった。
+
+All models were trained with mini-batch stochastic gradient descent (SGD) with a mini-batch size of 128. 
+すべてのモデルは、128のミニバッチサイズのミニバッチ確率的勾配降下（SGD）で訓練された。
+
+All weights were initialized from a zero-centered Normal distribution with standard deviation 0.02. 
+すべての重みは、標準偏差0.02のゼロ中心の正規分布から初期化した。
+
+In the LeakyReLU, the slope of the leak was set to 0.2 in all models.
+LeakyReLUでは、全モデルでリークの傾きを0.2に設定した。
+
+While previous GAN work has used momentum to accelerate training, we used the Adam optimizer (Kingma & Ba, 2014) with tuned hyperparameters. 
+これまでのGANの研究では、学習を高速化するために運動量を使用していましたが、我々はハイパーパラメタを調整したAdamオプティマイザー(Kingma & Ba, 2014)を使用しました。
+
+We found the suggested learning rate of 0.001, to be too high, using 0.0002 instead. Additionally, we found leaving the momentum term β1 at the suggested value of 0.9 resulted in training oscillation and instability while reducing it to 0.5 helped stabilize training.
+提案された学習率0.001は高すぎることがわかり、代わりに0.0002を使用した。さらに、運動量項β1を0.9のままにしておくと、訓練が振動して不安定になる一方で、0.5に減らすと訓練が安定することがわかりました。
+
+
+
+
+
+
+Figure 1: 
+
+DCGAN generator used for LSUN scene modeling. 
+LSUNシーンモデリングに使用されるDCGAN生成器。
+
+A 100 dimensional uniform distribution Z is projected to a small spatial extent convolutional representation with many feature maps.
+100次元の一様分布Zは、多くの特徴マップを持つ小さな空間的範囲の畳み込み表現に投影されます。
+
+A series of four fractionally-strided convolutions (in some recent papers, these are wrongly called deconvolutions) then convert this high level representation into a 64 × 64 pixel image. 
+4つの分割されたコンボリューション（最近の論文では、これらは誤ってデコンボリューションと呼ばれています）のシリーズは、この高レベルの表現を64×64ピクセルの画像に変換します。
+
+Notably, no fully connected or pooling layers are used.
+注目すべきは，完全に接続されたレイヤーやプーリングレイヤーは使用されていないことです．
+
+
+
+
+
+
+
+
+
+4.1
+LSUN
+
+As visual quality of samples from generative image models has improved, concerns of over-fitting and memorization of training samples have risen. 
+生成画像モデルからのサンプルの視覚的な品質が向上するにつれ、オーバーフィットやトレーニングサンプルの記憶に関する懸念が高まってきました。
+
+To demonstrate how our model scales with more data and higher resolution generation, we train a model on the LSUN bedrooms dataset containing a little over 3 million training examples. 
+我々のモデルがより多くのデータとより高い解像度でどのようにスケールするかを実証するために、我々は300万個強の訓練例を含むLSUN bedroomsデータセットでモデルを訓練しました。
+
+Recent analysis has shown that there is a direct link between how fast models learn and their generalization performance (Hardt et al., 2015). 
+最近の分析では、モデルの学習速度とその一般化性能の間には直接的なリンクがあることが示されています(Hardt et al., 2015)。
+
+We show samples from one epoch of training (Fig.2), mimicking online learning, in addition to samples after convergence (Fig.3), as an opportunity to demonstrate that our model is not producing high quality samples via simply overfitting/memorizing training examples. 
+我々は、収束後のサンプル（図3）に加えて、オンライン学習を模倣した訓練の1エポック（図2）からのサンプルを示し、我々のモデルが単に訓練例をオーバーフィット／記憶するだけで高品質のサンプルを生成していないことを実証する機会としている。
+
+No data augmentation was applied to the images
+画像にはデータの増強は行っていません。
+
+
+
+
+4.1.1
+DEDUPLICATION
+デデュプリケーション
+
+
+To further decrease the likelihood of the generator memorizing input examples (Fig.2) we perform a simple image de-duplication process. 
+生成器が入力例を記憶する可能性をさらに低下させるために（図2）、単純な画像の重複排除処理を行う。
+
+We fit a 3072-128-3072 de-noising dropout regularized RELU autoencoder on 32x32 downsampled center-crops of training examples. 
+我々は、学習例の32x32のダウンサンプリングされたセンター・クロップに、3072-128-3072のノイズ除去ドロップアウト正則化RELUオートエンコーダーを適合させる。
+
+The resulting code layer activations are then binarized via thresholding the ReLU activation which has been shown to be an effective information preserving technique (Srivastava et al., 2014) and provides a convenient form of semantic-hashing, allowing for linear time de-duplication . 
+これは、効果的な情報保存技術であることが示されており(Srivastava et al., 2014)、線形時間重複排除を可能にするセマンティックハッシュの便利な形を提供している。
+
+Visual inspection of hash collisions showed high precision with an estimated false positive rate of less than 1 in 100. 
+ハッシュの衝突を目視で検査したところ、推定誤検出率は100分の1以下であり、高い精度を示した。
+
+Additionally, the technique detected and removed approximately 275,000 near duplicates, suggesting a high recall.
+さらに、この技術は約275,000個の重複に近いものを検出して除去しており、高い再現性を示唆している。
+
+
+
+
+
+4.2
+FACES
+
+
+We scraped images containing human faces from random web image queries of peoples names. 
+人名のランダムなウェブ画像クエリから、人の顔を含む画像をスクレイピングした。
+
+The people names were acquired from dbpedia, with a criterion that they were born in the modern era.
+人名はdbpediaから取得したもので、現代生まれという基準を持っています。
+
+This dataset has 3M images from 10K people. 
+このデータセットには10K人の3Mの画像があります。
+
+We run an OpenCV face detector on these images, keeping the detections that are sufficiently high resolution, which gives us approximately 350,000 face boxes. 
+これらの画像に対してOpenCVの顔検出器を実行し、十分に高解像度の検出を維持することで、約35万個の顔ボックスが得られます。
+
+We use these face boxes for training. 
+これらの顔ボックスを学習に使用します。
+
+No data augmentation was applied to the images.
+画像にはデータの増強は行われていません。
+
+
+
+
+4.3
+IMAGENET-1K
+
+We use Imagenet-1k (Deng et al., 2009) as a source of natural images for unsupervised training. 
+教師なし学習のための自然画像源としてImagenet-1k (Deng et al., 2009)を用いる．
+
+We train on 32 × 32 min-resized center crops. 
+学習は32×32分リサイズされたセンタークロップを用いた。
+
+No data augmentation was applied to the images.
+画像にはデータの増強は行っていない．
+
+
+Figure 2: 
+
+Generated bedrooms after one training pass through the dataset. 
+データセットを1回学習した後に生成されたベッドルーム。
+
+Theoretically, the model could learn to memorize training examples, but this is experimentally unlikely as we train with a small learning rate and minibatch SGD. 
+理論的には、モデルは訓練例を記憶するように学習することができますが、学習率が小さく、ミニバッチSGDで訓練を行うため、実験的にはその可能性は低いと考えられます。
+
+We are aware of no prior empirical evidence demonstrating memorization with SGD and a small learning rate.
+我々は、SGDと小さな学習率での記憶化を実証した経験的証拠は、これまでにありませんでした。
+
+
+Figure 3: 
+
+Generated bedrooms after five epochs of training. 
+5エポックのトレーニング後に生成されたベッドルーム。
+
+There appears to be evidence of visual under-fitting via repeated noise textures across multiple samples such as the base boards of some of the beds.
+いくつかのベッドの底板のような複数のサンプルにわたって繰り返されるノイズのテクスチャによって、視覚的にアンダーフィットの証拠があるように見える。
+
+
+
+5
+EMPIRICAL VALIDATION OF DCGANS CAPABILITIES
+DCGANSの能力の経験的検証
+
+5.1
+CLASSIFYING CIFAR-10 USING GANS AS A FEATURE EXTRACTOR
+ギャンを特徴的な抽出器として使用する CIFAR-10 の分類
+
+One common technique for evaluating the quality of unsupervised representation learning algorithms is to apply them as a feature extractor on supervised datasets and evaluate the performance of linear models fitted on top of these features.
+教師なし表現学習アルゴリズムの品質を評価するための一般的な手法として、教師付きデータセット上で特徴抽出器として適用し、その上にフィットした線形モデルの性能を評価するというものがあります。
+
+
+
+
+
+
+
+On the CIFAR-10 dataset, a very strong baseline performance has been demonstrated from a well tuned single layer feature extraction pipeline utilizing K-means as a feature learning algorithm.
+CIFAR-10データセットでは、K-meansを特徴学習アルゴリズムとして利用した、よく調整された単層特徴抽出パイプラインにより、非常に強力なベースライン性能が実証されています。
+
+When using a very large amount of feature maps (4800) this technique achieves 80.6% accuracy.
+非常に大量の特徴マップ（4800）を使用した場合、この手法は80.6%の精度を達成しました。
+
+An unsupervised multi-layered extension of the base algorithm reaches 82.0% accuracy (Coates & Ng, 2011). 
+基本アルゴリズムを教師なしで多層に拡張した場合の精度は82.0%に達する(Coates & Ng, 2011)。
+
+To evaluate the quality of the representations learned by DCGANs for supervised tasks, we train on Imagenet-1k and then use the discriminator’s convolutional features from all layers, maxpooling each layers representation to produce a 4 × 4 spatial grid. 
+教師付きタスクのためにDCGANによって学習された表現の品質を評価するために、我々はImagenet-1k上で訓練し、次にすべての層から識別器の畳み込み特徴を使用して、各層の表現をmaxpoolingして4×4の空間グリッドを生成します。
+
+These features are then flattened and concatenated to form a 28672 dimensional vector and a regularized linear L2-SVM classifier is trained on top of them. 
+これらの特徴を平坦化して連結し、28672次元のベクトルを形成し、その上で正則化線形L2-SVM分類器を訓練します。
+
+This achieves 82.8% accuracy, out performing all K-means based approaches. Notably, the discriminator has many less feature maps (512 in the highest layer) compared to K-means based techniques, but does result in a larger total feature vector size due to the many layers of 4 × 4 spatial locations. 
+これにより、精度82.8%を達成し、すべてのK-meansベースのアプローチを凌駕しています。特筆すべきことに、この識別器はK-meansベースの手法と比較して、多くの少ない特徴マップ（最上位層の512）を持っていますが、4×4の空間的位置の多くの層のために、より大きな総特徴ベクトルサイズになります。
+
+The performance of DCGANs is still less than that of Exemplar CNNs (Dosovitskiy et al., 2015), a technique which trains normal discriminative CNNs in an unsupervised fashion to differentiate between specifically chosen, aggressively augmented, exemplar samples from the source dataset. 
+DCGANの性能は、通常の識別CNNを教師なしで訓練し、ソースデータセットから特別に選択された、積極的に増強された模範的なサンプルを区別する手法であるExemplar CNNs (Dosovitskiy et al., 2015)よりもまだ劣る。
+
+Further improvements could be made by finetuning the discriminator’s representations, but we leave this for future work. 
+識別器の表現を微調整することでさらなる改善が可能であるが、これは将来の研究に委ねる。
+
+Additionally, since our DCGAN was never trained on CIFAR-10 this experiment also demonstrates the domain robustness of the learned features.
+さらに、我々のDCGANはCIFAR-10では訓練されていないので、この実験では学習された特徴のドメインロバスト性も実証されています。
+
+
+
+
+
+
+
+
+5.2
+CLASSIFYING SVHN DIGITS USING GANS AS A FEATURE EXTRACTOR
+特徴的な抽出器としての GANS を使用した SVHN ディジットの分類
+
+On the StreetView House Numbers dataset (SVHN)(Netzer et al., 2011), we use the features of the discriminator of a DCGAN for supervised purposes when labeled data is scarce. 
+StreetView House Numbersデータセット(SVHN)(Netzer et al., 2011)では、ラベル付けされたデータが少ない場合に、DCGANの識別器の特徴を教師付きの目的で使用する。
+
+Following similar dataset preparation rules as in the CIFAR-10 experiments, we split off a validation set of 10,000 examples from the non-extra set and use it for all hyperparameter and model selection. 
+CIFAR-10実験と同様のデータセット作成ルールに従い、非エクストラセットから10,000例の検証セットを分割し、すべてのハイパーパラメータとモデルの選択に使用する。
+
+1000 uniformly class distributed training examples are randomly selected and used to train a regularized linear L2-SVM classifier on top of the same feature extraction pipeline used for CIFAR-10. 
+一様にクラス分布した1000個の訓練例をランダムに選択し、CIFAR-10で使用したのと同じ特徴抽出パイプラインの上で正則化線形L2-SVM分類器を訓練するために使用します。
+
+This achieves state of the art (for classification using 1000 labels) at 22.48% test error, improving upon another modifcation of CNNs designed to leverage unlabled data (Zhao et al., 2015). 
+これは、テストエラー22.48%で（1000個のラベルを用いた分類の場合）最先端の状態を達成し、有効でないデータを利用するように設計されたCNNの別の修正を改良したものである(Zhao et al., 2015)。
+
+Additionally, we validate that the CNN architecture used in DCGAN is not the key contributing factor of the model’s performance by training a purely supervised CNN with the same architecture on the same data and optimizing this model via random search over 64 hyperparameter trials (Bergstra & Bengio, 2012). 
+さらに、DCGANで使用されているCNNアーキテクチャがモデルの性能の重要な要因ではないことを、同じアーキテクチャを持つ純粋に教師付きCNNを同じデータ上で学習し、64回のハイパーパラメータ試行のランダム検索でこのモデルを最適化することで検証した(Bergstra & Bengio, 2012)。
+
+It achieves a signficantly higher 28.87% validation error.
+その結果，28.87%という極めて高い検証誤差を達成した．
+
+
+
+
+
+
+6
+INVESTIGATING AND VISUALIZING THE INTERNALS OF THE NETWORKS
+ネットワーク内部の調査と可視化
+
+We investigate the trained generators and discriminators in a variety of ways. We do not do any kind of nearest neighbor search on the training set. 
+我々は、訓練された生成器と識別器を様々な方法で調査する。我々は、訓練セットに対していかなる種類の最近傍探索も行わない。
+
+Nearest neighbors in pixel or feature space are trivially fooled (Theis et al., 2015) by small image transforms. 
+ピクセル空間または特徴空間における最近傍探索は、小さな画像変換によって些細なことで誤魔化されてしまう(Theis et al., 2015)。
+
+We also do not use log-likelihood metrics to quantitatively assess the model, as it is a poor (Theis et al., 2015) metric.
+また、我々は、モデルを定量的に評価するために対数尤度メトリクスを使用しない(Theis et al., 2015)貧弱なメトリクスであるため、対数尤度メトリクスを使用しない。
+
+
+
+
+
+
+6.1
+WALKING IN THE LATENT SPACE
+後期宇宙を歩く
+
+The first experiment we did was to understand the landscape of the latent space. 
+私たちが最初に行った実験は、潜在空間の風景を理解することでした。
+
+Walking on the manifold that is learnt can usually tell us about signs of memorization (if there are sharp transitions) and about the way in which the space is hierarchically collapsed. 
+学習された多様体上を歩くことで、通常、記憶の兆候（鋭い遷移がある場合）や、空間が階層的に崩壊している方法について知ることができます。
+
+If walking in this latent space results in semantic changes to the image generations (such as objects being added and removed), we can reason that the model has learned relevant and interesting representations. 
+この潜在空間を歩くことで、画像の世代に意味的な変化（オブジェクトが追加されたり削除されたりするなど）が生じた場合、モデルは関連性のある興味深い表現を学習したと推論することができます。
+
+The results are shown in Fig.4.
+その結果を図4に示す。
+
+
+
+
+6.2
+VISUALIZING THE DISCRIMINATOR FEATURES
+クリミネーターの特徴を可視化する
+
+Previous work has demonstrated that supervised training of CNNs on large image datasets results in very powerful learned features (Zeiler & Fergus, 2014). 
+これまでの研究では，大規模な画像データセット上での教師付きCNNの訓練の結果，非常に強力な学習特徴量が得られることが実証されている(Zeiler & Fergus, 2014)．
+
+Additionally, supervised CNNs trained on scene classification learn object detectors (Oquab et al., 2014). 
+さらに，シーン分類で訓練された教師付きCNNは物体検出器を学習する(Oquab et al., 2014)．
+
+We demonstrate that an unsupervised DCGAN trained on a large image dataset can also learn a hierarchy of features that are interesting.
+我々は、大規模な画像データセットで訓練された教師なしDCGANが、興味深い特徴の階層を学習することもできることを実証している。
+
+Using guided backpropagation as proposed by (Springenberg et al., 2014), we show in Fig.5 that the features learnt by the discriminator activate on typical parts of a bedroom, like beds and windows.
+(Springenberg et al., 2014)が提案しているGuided Backpropagationを用いて、図5に示すように、識別器によって学習された特徴がベッドや窓などの寝室の典型的な部分で活性化していることを示しています。
+
+For comparison, in the same figure, we give a baseline for randomly initialized features that are not activated on anything that is semantically relevant or interesting.
+比較のために、同じ図では、ランダムに初期化された特徴量のベースラインを示しており、意味的に関連性のあるものや興味深いものには活性化していない。
+
+
+
+
+6.3
+MANIPULATING THE GENERATOR REPRESENTATION
+ジェネレータ表示の管理
+
+6.3.1
+FORGETTING TO DRAW CERTAIN OBJECTS
+特定のオブジェクトの描き忘れ
+
+In addition to the representations learnt by a discriminator, there is the question of what representations the generator learns. 
+識別器が学習する表現に加えて、ジェネレーターが学習する表現にはどのようなものがあるかという問題がある。
+
+The quality of samples suggest that the generator learns specific object representations for major scene components such as beds, windows, lamps, doors, and miscellaneous furniture. 
+サンプルの質は、ベッド、窓、ランプ、ドア、雑多な家具などの主要なシーン構成要素について、ジェネレーターが特定のオブジェクト表現を学習していることを示唆している。
+
+In order to explore the form that these representations take, we conducted an experiment to attempt to remove windows from the generator completely.
+これらの表現がどのような形をとるのかを調べるために、ジェネレーターから窓を完全に取り除く実験を行いました。
+
+
+
+On 150 samples, 52 window bounding boxes were drawn manually.
+150 個のサンプルに対して、52 個の窓の境界ボックスを手動で描画した。
+
+On the second highest convolution layer features, logistic regression was fit to predict whether a feature activation was on a window (or not), by using the criterion that activations inside the drawn bounding boxes are positives and random samples from the same images are negatives. 
+2 番目に高い畳み込み層の特徴について、描画されたバウンディングボックス内の活性化が正であり、同じ画像からのランダムなサンプルが負であるという基準を用いて、特徴の活性化が窓上にあるかどうかを予測するために、ロジスティック回帰を適合させた。
+
+Using this simple model, all feature maps with weights greater than zero ( 200 in total) were dropped from all spatial locations. 
+この単純なモデルを用いて、重みが0より大きい特徴マップ（合計200）をすべての空間位置から削除した。
+
+Then,random new samples were generated with and without the feature map removal.
+次に、特徴マップを削除した場合と削除しなかった場合のランダムな新しいサンプルを生成した。
+
+
+The generated images with and without the window dropout are shown in Fig.6, and interestingly, the network mostly forgets to draw windows in the bedrooms, replacing them with other objects.
+興味深いことに、ネットワークはほとんどの場合、寝室に窓を描くことを忘れ、他のオブジェクトに置き換えている。
+
+
+
+
+Figure 4: 
+
+Top rows: Interpolation between a series of 9 random points in Z show that the space learned has smooth transitions, with every image in the space plausibly looking like a bedroom. 
+上の行。Zの9つのランダムな点の間の補間は、学習された空間が滑らかな遷移を持っていることを示しており、空間内のすべての画像がベッドルームのように見える。
+
+In the 6th row, you see a room without a window slowly transforming into a room with a giant window.
+6列目では、窓のない部屋がゆっくりと巨大な窓のある部屋に変化しているのがわかる。
+
+In the 10th row, you see what appears to be a TV slowly being transformed into a window.
+10列目では、テレビと思われるものがゆっくりと窓に変身しています。
+
+
+
+
+
+
+
+
+
+6.3.2
+VECTOR ARITHMETIC ON FACE SAMPLES
+顔面のベクターアリティクス
+
+
+In the context of evaluating learned representations of words (Mikolov et al., 2013) demonstrated that simple arithmetic operations revealed rich linear structure in representation space. 
+学習された単語の表現を評価する文脈では（Mikolovら、2013）、単純な算術演算によって表現空間の豊かな線形構造が明らかになることが実証された。
+
+One canonical example demonstrated that the vector(”King”) - vector(”Man”) + vector(”Woman”) resulted in a vector whose nearest neighbor was the vector for Queen. 
+定型的な例では、ベクトル("王様") - ベクトル("男") + ベクトル("女")の結果、最も近い隣人が女王のためのベクトルであるベクトルが得られることが示された。
+
+We investigated whether similar structure emerges in the Z representation of our generators. We performed similar arithmetic on the Z vectors of sets of exemplar samples for visual concepts. 
+我々は，我々の生成器のZ表現にも同様の構造が現れるかどうかを調べた．我々は、視覚的な概念のための模範的なサンプルの集合のZベクトルに対して同様の演算を行いました。
+
+Experiments working on only single samples per concept were unstable, but averaging the Z vector for three examplars showed consistent and stable generations that semantically obeyed the arithmetic. 
+概念ごとに1つのサンプルのみで行った実験では不安定でしたが、3つのサンプルのZベクトルを平均化すると、意味的に演算に従う一貫した安定した世代が得られました。
+
+In addition to the object manipulation shown in (Fig. 7), we demonstrate that face pose is also modeled linearly in Z space (Fig. 8).
+図7）に示した物体操作に加えて、顔のポーズもZ空間で線形にモデル化されていることを実証しました（図8）。
+
+These demonstrations suggest interesting applications can be developed using Z representations learned by our models. 
+これらの実証は、我々のモデルによって学習されたZ表現を用いて、興味深いアプリケーションが開発できることを示唆している。
+
+It has been previously demonstrated that conditional generative models can learn to convincingly model object attributes like scale, rotation, and position (Dosovitskiy et al., 2014). 
+条件付き生成モデルが、スケール、回転、位置などの物体属性を説得力を持ってモデル化できることは、以前にも実証されています(Dosovitskiy et al., 2014)。
+
+This is to our knowledge the first demonstration of this occurring in purely unsupervised models. 
+これは、私たちの知る限り、純粋に教師なしのモデルでこのようなことが起こることを初めて実証したものです。
+
+Further exploring and developing the above mentioned vector arithmetic could dramatically reduce the amount of data needed for conditional generative modeling of complex image distributions.
+上述のベクトル演算をさらに探求し、開発することで、複雑な画像分布の条件付き生成モデリングに必要なデータ量を劇的に減らすことができます。
+
+
+
+
+
+Figure 5: 
+
+On the right, guided backpropagation visualizations of maximal axis-aligned responses for the first 6 learned convolutional features from the last convolution layer in the discriminator.
+右側は、識別器の最後の畳み込み層から最初に学習した6つの畳み込み特徴の最大軸に沿った応答のバックプロパゲーションの可視化を示しています。
+
+Notice a significant minority of features respond to beds - the central object in the LSUN bedrooms dataset.
+特徴のかなりの少数がベッド（LSUNのベッドルームデータセットの中心的なオブジェクト）に反応していることに注目してください。
+
+On the left is a random filter baseline. Comparing to the previous responses there is little to no discrimination and random structure.
+左側はランダムフィルタのベースラインです。以前の応答と比較して、識別とランダム構造はほとんどありません。
+
+
+Figure 6: 
+
+Top row: un-modified samples from model. 
+上段：モデルからの変更されていないサンプル。
+
+Bottom row: the same samples generated with dropping out ”window” filters. 
+下段：「窓」フィルターを削除して生成された同じサンプル。
+
+Some windows are removed, others are transformed into objects with similar visual appearance such as doors and mirrors. 
+いくつかの窓は削除され、他の窓はドアや鏡のような類似した外観のオブジェクトに変換されています。
+
+Although visual quality decreased, overall scene composition stayed similar, suggesting the generator has done a good job disentangling scene representation from object representation. 
+視覚的な品質は低下しましたが、全体的なシーン構成は似たようなもので、ジェネレータがシーン表現とオブジェクト表現を分離するのに十分な仕事をしていることを示唆しています。
+
+
+Extended experiments could be done to remove other objects from the image and modify the objects the generator draws.
+画像から他のオブジェクトを削除したり、ジェネレーターが描くオブジェクトを変更したりするために、実験を拡張することができます。
+
+
+
+
+
+7
+CONCLUSION AND FUTURE WORK
+結論と今後の取り組み
+
+We propose a more stable set of architectures for training generative adversarial networks and we give evidence that adversarial networks learn good representations of images for supervised learning and generative modeling. 
+我々は、生成的敵対的ネットワークを学習するためのより安定したアーキテクチャのセットを提案し、敵対的ネットワークが教師付き学習と生成的モデリングのための画像の良い表現を学習するという証拠を示す。
+
+There are still some forms of model instability remaining - we noticed as models are trained longer they sometimes collapse a subset of filters to a single oscillating mode.
+モデルの不安定性にはまだいくつかの形態が残っています-モデルの訓練が長くなるにつれて、フィルタのサブセットが単一の振動モードに崩壊することがあることに気付きました。
+
+Further work is needed to tackle this from of instability. 
+この不安定性に対処するためには、さらなる作業が必要です。
+
+We think that extending this framework to other domains such as video (for frame prediction) and audio (pre-trained features for speech synthesis) should be very interesting. 
+このフレームワークをビデオ（フレーム予測のための）やオーディオ（音声合成のための事前学習された特徴）などの他の領域に拡張することは非常に興味深いことだと思います。
+
+Further investigations into the properties of the learnt latent space would be interesting as well.
+また、学習された潜在空間の特性についてのさらなる調査も興味深いものになるでしょう。
+
+ACKNOWLEDGMENTS
+
+
+We are fortunate and thankful for all the advice and guidance we have received during this work, especially that of Ian Goodfellow, Tobias Springenberg, Arthur Szlam and Durk Kingma. 
+この作業中に受けたすべてのアドバイスと指導、特に Ian Goodfellow、Tobias Springenberg、Arthur Szlam、Durk Kingma には幸運にも感謝しています。
+
+Additionally we’d like to thank all of the folks at indico for providing support, resources, and conversations, especially the two other members of the indico research team, Dan Kuster and Nathan Lintz. 
+また、サポート、リソース、会話を提供してくださったindicoの皆様、特にindico研究チームの他の2人のメンバー、Dan KusterとNathan Lintzに感謝します。
+
+Finally, we’d like to thank Nvidia for donating a Titan-X GPU used in this work.
+最後に、この作業に使用したTitan-X GPUを提供してくれたNvidiaに感謝します。
+
+
+
+
+
+
+
+
+
+
+
+
+
+Figure 7: 
+
+Vector arithmetic for visual concepts. 
+視覚的な概念のためのベクトル演算。
+
+For each column, the Z vectors of samples are averaged. 
+各列について、サンプルのZ ベクトルが平均化されます。
+
+Arithmetic was then performed on the mean vectors creating a new vector Y . 
+その後、平均ベクトルに対して演算が実行され、新しいベクトル Y が生成されます。
+
+The center sample on the right hand side is produce by feeding Y as input to the generator. 
+右側の中央のサンプルは、Y をジェネレータへの入力として供給することで生成されます。
+
+To demonstrate the interpolation capabilities of the generator, uniform noise sampled with scale +-0.25 was added to Y to produce the 8 other samples. 
+ジェネレータの補間機能を実証するために、スケール +-0.25 でサンプリングされた一様なノイズが Y に追加され、他の 8 つのサンプルが生成されました。
+
+Applying arithmetic in the input space (bottom two examples) results in noisy overlap due to misalignment.
+入力空間に算術を適用すると（下の2つの例）、位置ずれによるノイズの重なりが発生します。
+
+
+Figure 8:
+
+A ”turn” vector was created from four averaged samples of faces looking left vs looking right. 
+左を見ている顔と右を見ている顔の4つの平均サンプルから「ターン」ベクトルが作成されました。
+
+By adding interpolations along this axis to random samples we were able to reliably transform their pose.
+ランダムなサンプルにこの軸に沿って補間を加えることで、顔のポーズを確実に変換することができました。
+
+
+
+
+
+
+
+
