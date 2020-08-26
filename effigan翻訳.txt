@@ -1,0 +1,212 @@
+EFFICIENT GAN-BASED ANOMALY DETECTION
+
+
+
+
+ABSTRACT
+
+Generative adversarial networks (GANs) are able to model the complex high-dimensional distributions of real-world data, which suggests they could be effective for anomaly detection. 
+生成的敵対者ネットワーク（GAN）は、実世界のデータの複雑な高次元分布をモデル化することができるため、異常検知に有効であることが示唆されている。
+
+However, few works have explored the use of GANs for the anomaly detection task. 
+しかし、これまでGANの異常検知への応用を検討した研究はほとんどありませんでした。
+
+We leverage recently developed GAN models for anomaly detection, and achieve state-of-the-art performance on image and network intrusion datasets, while being several hundred-fold faster at test time than the only published GAN-based method.
+本研究では、最近開発されたGANモデルを異常検知に活用し、画像やネットワーク侵入データに対して最先端の性能を実現するとともに、唯一のGANベースの手法と比較して、テスト時間を数百倍に短縮することに成功しました。
+
+
+
+
+INTRODUCTION
+
+
+
+Anomaly detection is one of the most important problems across a range of domains, including manufacturing (Mart et al., 2015), medical imaging and cyber-security (Schubert et al., 2014). 
+異常検知は、製造業（Martら、2015）、医療画像処理、サイバーセキュリティ（Schubertら、2014）を含む様々な領域にわたる最も重要な問題の一つである。
+
+Fundamentally, anomaly detection methods need to model the distribution of normal data, which can be complex and high-dimensional. 
+基本的に、異常検出手法は、複雑で高次元になりうる正規データの分布をモデル化する必要があります。
+
+Generative adversarial networks (GANs) (Goodfellow et al.,2014) are one class of models that have been successfully used to model such complex and high-dimensional distributions, particularly over natural images (Radford et al., 2016).
+生成的敵対ネットワーク（GAN）（Goodfellowら、2014）は、このような複雑で高次元の分布をモデル化するために、特に自然画像上で成功裏に使用されてきたモデルの1つのクラスである（Radfordら、2016）。
+
+Intuitively, a GAN that has been well-trained to fit the distribution of normal samples should be able to reconstruct such a normal sample from a certain latent representation and also discriminate the sample as coming from the true data distribution. 
+直感的には、正規サンプルの分布に適合するように十分に訓練されたGANは、ある潜在表現からそのような正規サンプルを再構成することができ、また、サンプルが真のデータ分布から来ていることを識別することができるはずです。
+
+However, as GANs only implicitly model the data distribution, using them for anomaly detection necessitates a costly optimization procedure to recover the latent representation of a given input example, making this an impractical approach for large datasets or real-time applications.
+しかし、GANはデータ分布を暗黙的にモデル化するだけなので、異常検出にGANを使用すると、与えられた入力例の潜在表現を回復するためにコストのかかる最適化手順が必要となり、大規模なデータセットやリアルタイムのアプリケーションでは非現実的なアプローチとなります。
+
+In this work, we leverage recently developed GAN methods that simultaneously learn an encoder during training (Vincent Dumoulin & Courville, 2017; Donahue et al., 2017) to develop an anomaly detection method that is efficient at test time.
+本研究では、トレーニング中にエンコーダを同時に学習する最近開発されたGAN法(Vincent Dumoulin & Courville, 2017; Donahueら, 2017)を活用し、テスト時に効率的な異常検出法を開発する。
+
+We apply our method to an image dataset (MNIST) (LeCun et al., 1998) and a network intrusion dataset (KDD99 10percent) (Lichman, 2013) and show that it is highly competitive with other approaches. 
+我々は、画像データセット(MNIST) (LeCun et al., 1998)とネットワーク侵入データセット(KDD99 10percent) (Lichman, 2013)に我々の手法を適用し、他のアプローチとの競争力が高いことを示す。
+
+To the best of our knowledge, our method is the first GAN-based approach for anomaly detection which achieves state-of-the-art results on the KDD99 dataset. 
+我々の知る限りでは、我々の手法は、KDD99データセットで最先端の結果を達成した、異常検知のための最初のGANベースのアプローチである。
+
+An implementation of our methods and experiments is provided at github.
+我々の手法と実験の実装はgithubで提供されています。
+
+
+
+
+
+RELATED WORK
+関連記事
+
+Anomaly detection has been extensively studied, as surveyed in (Chandola et al., 2009).
+(Chandola et al., 2009)で調査されているように、異常検出は広く研究されてきた。
+
+Popular techniques utilize clustering approaches or nearest neighbor methods (Xiong et al., 2011; Zimek et al., 2012) and one class classification approaches that learn a discriminative boundary around normal data, such as one-class SVMs (Yunqiang Chen & Huang, 2001).
+一般的な手法としては、クラスタリングアプローチや最近傍法(Xiong et al., 2011; Zimek et al., 2012)を利用したものや、1クラスSVMのような正常データの周囲の識別境界を学習する1クラス分類アプローチ(Yunqiang Chen & Huang, 2001)などがある。
+
+Another class of methods uses fidelity of reconstruction to determine whether an example is anomalous, and includes Principal Component Analysis (PCA) and its kernel and robust variants (Jolliffe, 1986;S.Gnter & Vishwanathan, 2007; Cand`es et al., 2009). 
+別のクラスの手法は、再構成の忠実度を用いて例が異常であるかどうかを判断するもので、主成分分析(PCA)とそのカーネルおよびロバストバリアントを含む(Jolliffe, 1986;S.Gnter & Vishwanathan, 2007; Cand`es et al., 2009)。
+
+More recent works use deep neural networks, which do not require explicit feature construction unlike the previously mentioned methods. 
+より最近の研究では、以前に述べた方法とは異なり、明示的な特徴構築を必要としないディープニューラルネットワークを使用しています。
+
+Autoencoders, variational autoencoders (An & Cho, 2015; Zhou & Paffenroth, 2017), energy based models (Zhai et al., 2016) and deep autoencoding Gaussian mixture models (Bo Zong, 2018) have been explored for anomaly detection. 
+オートエンコーダー、変分オートエンコーダー（An & Cho, 2015; Zhou & Paffenroth, 2017）、エネルギーベースモデル（Zhaiら, 2016）、およびディープオートエンコーディングガウス混合モデル（Bo Zong, 2018）が、異常検出のために探索されてきた。
+
+Aside from AnoGAN (Schlegl et al., 2017), however, the use of GANs for anomaly detection has been relatively unexplored, even though GANs are suited to model the high-dimensional complex distributions of real-world data (Creswell et al., 2017).
+しかし、AnoGAN（Schleglら、2017）は別として、GANは実世界のデータの高次元複雑分布をモデル化するのに適しているにもかかわらず、異常検出のためのGANの使用は比較的未開拓であった（Creswellら、2017）。
+
+
+
+EFFICIENT ANOMALY DETECTION WITH GANS
+ガンによる効率的な異常検出
+
+
+
+Our models are based on recently developed GAN methods(Donahue et al.,2017;Vincent Dumoulin & Courville, 2017) (specifically BiGAN), and simultaneously learn an encoder E that maps input samples x to a latent representation z, along with a generator G and discriminator D during training; this enables us to avoid the computationally expensive step of recovering a latent representation at test time. 
+我々のモデルは、最近開発されたGAN法(Donahue et al.,2017;Vincent Dumoulin & Courville,2017) (具体的にはBiGAN)に基づいており、入力サンプルxを潜在表現zにマッピングするエンコーダEを、学習中にジェネレータGおよび識別器Dとともに同時に学習する。
+
+Unlike in a regular GAN where the discriminator only considers inputs (real or generated), the discriminator D in this context also considers the latent representation (either a generator input or from the encoder).
+これにより、テスト時に潜在表現を回復するという計算量の高いステップを回避することができます。通常のGANでは、判別器は入力（実数または生成数）のみを考慮しますが、この文脈では判別器Dは潜在表現（ジェネレータ入力またはエンコーダからの入力）も考慮します。
+
+Vincent Dumoulin & Courville (2017) explored different training strategies to learn an encoder such that E=G−1, and emphasized the importance of learning E jointly with G.
+Vincent Dumoulin & Courville（2017）は、E=G-1となるようなエンコーダを学習するための異なる学習戦略を探索し、EをGと共同で学習することの重要性を強調した。
+
+We therefore adopted a similar strategy, solving the following optimization problem during training: min G,E max D V (D, E, G), with V (D, E, G) defined as (1)
+したがって、我々は、同様の戦略を採用し、訓練中に以下の最適化問題を解く：min G,E max D V (D,E,G)、V (D,E,G)を(1)のように定義する。
+
+
+
+
+
+
+Here, pX(x) is the distribution over the data, pZ(z) the distribution over the latent representation, and pE(z|x) and pG(x|z) the distributions induced by the encoder and generator respectively.
+ここで、pX(x)はデータ上の分布、pZ(z)は潜在表現上の分布、pE(z|x)とpG(x|z)はそれぞれエンコーダとジェネレータによって誘導される分布である。
+
+Having trained a model on the normal data to yield G, D and E, we then define a score function A(x) (as in Schlegl et al. (2017)) that measures how anomalous an example x is, based on a convex combination of a reconstruction loss LG and a discriminator-based loss LD:(2)
+正規データ上でモデルを訓練してG, D, Eを得た後、再構成損失LGと識別器ベースの損失LDの凸型の組み合わせに基づいて、例題xがどれだけ異常であるかを測定するスコア関数A(x) (Schleglら(2017)のように)を定義します: (2)
+
+
+
+
+
+
+
+
+
+
+where LG(x) = ||x − G(E(x))||1 and LD(x) can be defined in two ways.
+ここで LG(x) = ||x - G(E(x))||1 と LD(x) は 2 つの方法で定義できます。
+
+First, using the cross-entropy loss σ from the discriminator of x being a real example (class 1): LD(x) = σ(D(x, E(x)), 1), which captures the discriminator’s confidence that a sample is derived from the real data distribution. 
+まず、xを実例(クラス1)とする判別器からのクロスエントロピー損失σを用います。LD(x) = σ(D(x, E(x)), 1), これは、サンプルが実データ分布に由来するという識別器の信頼度を捉えます。
+
+A second way of defining the LD is with a “feature-matching loss”LD(x) =||fD(x, E(x)) − fD(G(E(x)), E(x))||1, with fD returning the layer preceding the logits for the given inputs in the discriminator. 
+LDを定義する第2の方法は，"特徴一致損失" LD(x) =||fD(x, E(x)) - fD(G(E(x)), E(x))||1, fD は判別器の与えられた入力に対するロジットの前の層を返します。
+
+This evaluates if the reconstructed data has similar features in the discriminator as the true sample. 
+これは、再構成されたデータが真のサンプルと同様の特徴を判別器で持っているかどうかを評価します。
+
+Samples with larger values of A(x) are deemed more likely to be anomalous.
+A(x) の値が大きいサンプルは、異常である可能性が高いとみなされます。
+
+
+
+
+
+
+
+
+EXPERIMENTS
+
+
+
+We provide details of the experimental setup and network architectures used in the Appendix.
+付録で使用した実験セットアップとネットワークアーキテクチャの詳細を提供します。
+
+MNIST: 
+We generated 10 different datasets from MNIST by successively making each digit class an anomaly and treating the remaining 9 digits as normal examples. 
+各桁のクラスを連続して異常とし、残りの9桁を正常例とすることで、MNISTから10個の異なるデータセットを生成した。
+
+The training set consists of 80% of the normal data and the test set consists of the remaining 20% of normal data and all of the anomalous data. 
+学習セットは80%の正常データから構成され、テストセットは残りの20%の正常データとすべての異常データから構成されている。
+
+All models were trained only with normal data and tested with both normal and anomalous data. 
+すべてのモデルは正常データのみで訓練され、正常データと異常データの両方でテストされた。
+
+As the dataset is imbalanced, we compared models using the area under the precision-recall curve (AUPRC). 
+データセットが不均衡であるため、精度-リコール曲線下面積（AUPRC）を用いてモデルを比較した。
+
+We evaluated our method against AnoGAN and the variational auto-encoder (VAE) of (An & Cho, 2015). 
+我々の手法をAnoGANと(An & Cho, 2015)の変分自動エンコーダー(VAE)に対して評価した。
+
+We see that our model significantly outperforms the VAE baseline. Likewise, our model outperforms AnoGAN (Figure 1), but with approximately 800x faster inference time (Table 2). 
+我々のモデルは、我々のモデルがVAEのベースラインよりも有意に優れていることがわかる。同様に、我々のモデルはAnoGAN（図1）よりも優れているが、約800倍速い推論時間である（表2）。
+
+We also observed that the feature-matching variant of LD used in the anomaly score performs better than the cross-entropy variant, which was also reported in Schlegl et al. (2017), suggesting that the features extracted by the discriminator are informative for anomaly detection.
+また、異常スコアに使用されるLDの特徴一致バリアントが、Schleglら（2017）でも報告されたクロスエントロピーバリアントよりも優れた性能を発揮することが観察され、識別器によって抽出された特徴が異常検出に有益であることを示唆しています。
+
+
+
+
+KDD99: We evaluated our method on this network activity dataset to show that GANs can also perform well on high-dimensional, non-image data. 
+KDD99を使用しています。我々は、GANが高次元の非画像データ上でも良好なパフォーマンスを発揮できることを示すために、このネットワーク活動データセット上で我々の手法を評価した。
+
+We follow the experimental setup of (Zhai et al.,2016; Bo Zong, 2018) on the KDDCUP99 10 percent dataset (Lichman, 2013). 
+我々は、KDDCUP99 10パーセントデータセット(Lichman, 2013)での(Zhai et al.,2016; Bo Zong, 2018)の実験的セットアップに従う。
+
+Due to the proportion of outliers in the dataset “normal” data are treated as anomalies in this task. 
+データセット内の外れ値の割合のため、「正常な」データはこのタスクでは異常値として扱われます。
+
+The 20% of samples with the highest anomaly scores A(x) are classified as anomalies (positive class), and we evaluated precision, recall, and F1-score accordingly. 
+最も高い異常スコアA(x)を持つサンプルの20%を異常（正のクラス）として分類し、それに応じて精度、リコール、F1スコアを評価した。
+
+For training, we randomly sampled 50% of the whole dataset and the remaining 50% of the dataset was used for testing. 
+学習には、データセット全体の50%をランダムにサンプリングし、残りの50%をテストに使用した。
+
+
+Then, only data samples from the normal class were used for training models, therefore, all anomalous samples were removed from the split training set. 
+その後、正規クラスのデータサンプルのみをモデルの学習に使用し、そのため、すべての異常サンプルは分割された学習セットから除去された。
+
+Our method is overall highly competitive with other state-of-the art methods and achieves higher recall. 
+我々の手法は、他の最先端の手法と比較して、全体的に非常に競争力があり、より高いリコールを達成しています。
+
+Again, our model outperforms AnoGAN and also has a 700x to 900x faster inference time (Table 2).
+ここでも、我々のモデルはAnoGANよりも優れており、推論時間も700倍から900倍速くなっています（表2）。
+
+
+
+
+CONCLUSION
+
+
+We demonstrated that recent GAN models can be used to achieve state-of-the-art performance for anomaly detection on high-dimensional, complex datasets whilst being efficient at test time; our use of a GAN that simultaneously learns an encoder eliminates the need for a costly procedure to recover the latent representation for a given input. 
+我々は、最近のGANモデルを使用して、高次元で複雑なデータセットの異常検出のための最先端の性能を達成することができることを、テスト時間の効率が良いと同時に実証しました。
+
+In future work, we plan to perform a more extensive evaluation of our method, evaluate other training strategies, as well as to explore the effects of encoder accuracy on anomaly detection performance.
+今後の研究では、我々の手法をより広範囲に評価し、他の学習戦略を評価し、異常検出性能に対するエンコーダの精度の効果を調査する予定です。
+
+
+
+
+
+
+
+

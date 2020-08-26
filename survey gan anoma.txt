@@ -1,0 +1,689 @@
+A Survey on GANs for Anomaly Detection
+
+異常検出のためのGANに関する調査
+
+
+Anomaly detection is a significant problem faced in several research areas. 
+異常検知は、いくつかの研究分野で直面している重要な問題です。
+
+
+Detecting and correctly classifying something unseen as anomalous is a challenging problem that has been tackled in many different manners over the years. 
+目に見えないものを異常として検出し、正しく分類することは、長年にわたり様々な方法で取り組まれてきた難しい問題です。
+
+Generative Adversarial Networks (GANs) and the adversarial training process have been recently employed to face this task yielding remarkable results. 
+近年、この問題に対処するためにGAN（Generative Adversarial Networks）や逆襲訓練法が採用され、注目すべき結果が得られている。
+
+In this paper we survey the principal GAN-based anomaly detection methods, highlighting their pros and cons. 
+本論文では、GANに基づく主要な異常検出手法を調査し、その長所と短所を強調する。
+
+Our contributions are the empirical validation of the main GAN models for anomaly detection, the increase of the experimental results on different datasets and the public release of a complete Open Source toolbox for Anomaly Detection using GANs.
+我々の貢献は、異常検出のための主要なGANモデルの実証的検証、異なるデータセットでの実験結果の増加、GANを用いた異常検出のための完全なオープンソースツールボックスの一般公開である。
+
+
+ Introduction
+
+
+
+Anomalies are patterns in data that do not conform to a well-defined notion of normal behavior (Chandola et al.,2009). 
+アノマリーとは、よく定義された正常な振る舞いの概念に適合しないデータのパターンのことである(Chandola et al.,2009)。
+
+Generative Adversarial Networks (GANs) and the adversarial training framework (Goodfellow et al., 2014) have been successfully applied to model complex and high dimensional distribution of real-world data. 
+Generative Adversarial Networks (GANs)やAdversarial training framework (Goodfellow et al., 2014)は、実世界のデータの複雑で高次元な分布をモデル化することに成功している。
+
+This GAN characteristic suggests they can be used successfully for anomaly detection, although their application has been only recently explored. 
+このようなGANの特徴は、GANが異常検知にうまく利用できることを示唆しているが、その応用はごく最近になってから検討されている。
+
+Anomaly detection using GANs is the task of modeling the normal behavior using the adversarial training process and detecting the anomalies measuring an anomaly score (Schlegl et al., 2017). 
+GANを用いた異常検出は、敵対的な訓練過程を用いて正常な振る舞いをモデル化し、異常スコアを測定して異常を検出する作業である（Schleglら、2017）。
+
+
+
+
+
+To the best of our knowledge, all the GAN-based approaches to anomaly detection build upon on the Adversarial Feature Learning idea (Donahue et al., 2016) in which the BiGAN architecture has been proposed. 
+我々の知る限りでは、すべてのGANベースの異常検出アプローチは、BiGANアーキテクチャが提案されているAdversarial Feature Learningのアイデア(Donahue et al., 2016)に基づいて構築されています。
+
+In their original formulation, the GAN framework learns a generator that maps samples from an arbitrary latent distribution (noise prior) to data as well as a discriminator which tries to distinguish between real and generated samples. 
+彼らのオリジナルの定式化では、GANフレームワークは、任意の潜在分布（ノイズ先行）からのサンプルをデータにマッピングする生成器と、実サンプルと生成サンプルを区別しようとする識別器を学習する。
+
+The BiGAN architecture extended the original formulation, adding the learning of the inverse mapping which maps the data back to the latent representation. 
+BiGANアーキテクチャは、オリジナルの定式化を拡張し、データを潜在表現にマップする逆マッピングの学習を追加しました。
+
+A learned function that maps input data to its latent representation together with a function that does the opposite (the generator) is the basis of the anomaly detection using GANs.
+入力データをその潜在表現にマッピングする学習関数と、その逆を行う関数（ジェネレータ）がGANを用いた異常検出の基礎となっています。
+
+
+The paper is organized as follows. 
+本論文は以下のように構成されている。
+
+In Section 1 we introduce the GANs framework and, briefly, its most innovative extensions, namely conditional GANs and BiGAN, respectively in Section 1.2 and Section 1.3. 
+第1節ではGANsフレームワークを紹介し、第1.2節では条件付きGANs、第1.3節ではその最も革新的な拡張であるBiGANについて簡単に紹介する。
+
+Section 2 contains the state of the art architectures for anomaly detection with GANs.
+第2節では、GANsを用いた異常検知のための最新のアーキテクチャを紹介する。
+
+In Section 3 we empirically evaluate all the analyzed architectures. 
+第3節では、分析された全てのアーキテクチャを経験的に評価する。
+
+Finally, Section 4 contains the conclusions and future research directions.
+最後に第4節では、結論と今後の研究の方向性を述べる。
+
+
+
+
+
+
+
+GANs
+
+
+GANs are a framework for the estimation of generative models via an adversarial process in which two models, a discriminator D and a generator G, are trained simultaneously. 
+GANは、2つのモデル、識別器Dと生成器Gが同時に訓練される敵対的プロセスを介して生成モデルを推定するためのフレームワークである。
+
+
+The generator G aim is to capture the data distribution, while the discriminator D estimates the probability that a sample came from the training data rather than G. 
+ジェネレータGの目的は、データ分布を捉えることであり、判別器Dは、サンプルがGではなく訓練データから来た確率を推定します。
+
+To learn a generative distribution pg over the data x the generator builds a mapping from a prior noise distribution pz to a data space as G(z; θG), where θG are the generator parameters.
+データx上の生成分布pgを学習するために、生成器は事前のノイズ分布pzからデータ空間への写像をG(z; θG)として構築します（ここでθGは生成器のパラメータです）。
+
+The discriminator outputs a single scalar representing the probability that x came from real data rather than from pg.
+判別器は、xがpgからではなく実データから来た確率を表す1つのスカラーを出力します。
+
+The generator function is denoted with D(x; θD), where θD are discriminator parameters.
+ジェネレータ関数はD(x; θD)で表され、ここでθDは判別パラメータです。
+
+The original GAN framework (Goodfellow et al., 2014) poses this problem as a min-max game in which the two players (G and D) compete against each other, playing the following zero-sum min-max game:
+オリジナルのGANフレームワーク(Goodfellow et al., 2014)は、この問題を、2人のプレイヤー(GとD)が、次のようなゼロサムのmin-maxゲームをしながら、お互いに競い合うmin-maxゲームとして提起します。
+
+
+
+
+
+
+
+Conditional GANs
+
+GANs can be extended to a conditional model (Mirza & Osindero, 2014) conditioning either G or D on some extra information y. 
+GANは条件付きモデル(Mirza & Osindero, 2014)に拡張することができる。
+
+
+The y condition could be any auxiliary information, such as class labels or data from other modalities. 
+y条件は、クラス・ラベルや他のモダリティからのデータなどの補助的な情報である。
+
+
+We can perform the conditioning by feeding y into both the discriminator and generator as an additional input layer. 
+我々は、追加の入力層として識別器と生成器の両方にyを入力することで条件付けを行うことができる。
+
+
+The generator combines the noise prior pz(z) and y in a joint hidden representation, the adversarial training framework allows for considerable flexibility in how this hidden representation is composed. 
+ジェネレータは、ノイズ先行値pz(z)とyを結合して共同隠れ表現を作成しますが、この隠れ表現がどのように構成されるかについては、敵対的学習フレームワークによってかなりの柔軟性が得られます。
+
+
+In the discriminator, x and y are presented as inputs to a discriminative function.
+識別器では、xとyが識別関数の入力として提示されます。
+
+
+The objective function considering the condition becomes:
+条件を考慮した目的関数は次のようになる。
+
+
+
+ BiGAN
+
+
+
+Bidirectional GAN (Donahue et al., 2016) extends the GAN framework including an encoder E(x; θE) that learns the inverse of the generator E = G−1. 
+双方向ＧＡＮ（Donahueら、2016）は、生成器Ｅ＝Ｇ-１の逆行列を学習するエンコーダＥ（ｘ；θＥ）を含むＧＡＮフレームワークを拡張する。
+
+The BiGAN training process allows learning a mapping simultaneously from latent space to data and vice versa. 
+BiGANの学習プロセスは、潜在空間からデータへの写像を同時に学習し、その逆も学習することを可能にする。
+
+The encoder E is a non-linear parametric function in the same way as G and D, and it can be trained using gradient descent. 
+符号化器Ｅは、ＧやＤと同様に非線形パラメトリック関数であり、勾配降下を用いて学習することができる。
+
+As in the conditional GANs scenario, the discriminator must learn to classify not only real and fake samples, but pairs in the form (G(z), z) or (x, E(x)). 
+条件付きGANのシナリオと同様に、判別器は、実サンプルと偽サンプルだけでなく、(G(z), z)または(x, E(x))の形のペアを分類するために学習しなければならない。
+
+The BiGAN training objective is:
+BiGANの学習目的は
+
+
+
+
+
+
+GANs for anomaly detection
+
+Anomaly detection using GANs is an emerging research field. 
+GANを用いた異常検出は、新興の研究分野である。
+
+Schlegl et al. (2017), here referred to as AnoGAN, were the first to propose such a concept. 
+Schleglら(2017)は、ここではAnoGANと呼ばれ、そのような概念を最初に提案した。
+
+In order to face the performance issues of AnoGAN a BiGAN-based approach has been proposed in Zenati et al. (2018), here referred as EGBAD (Efficient GAN Based Anomaly Detection), that outperformed AnoGAN execution time. 
+AnoGANの性能問題に対処するために、Zenatiら（2018）ではBiGANベースのアプローチが提案されており、EGBAD（Efficient GAN Based Anomaly Detection）と呼ばれ、AnoGANの実行時間を上回る性能を示した。
+
+Recently, Akcay et al. (2018) advanced a GAN + autoencoder based approach that exceeded EGBAD performance from both evaluation metrics and execution speed.
+最近では、Akcayら（2018）が、評価指標と実行速度の両方からEGBADの性能を上回るGAN + autoencoderベースのアプローチを進めた。
+
+In the following sections, we present an analysis of the considered architecture. 
+以下のセクションでは、考慮されたアーキテクチャの分析を提示する。
+
+The term sample and image are used interchangeably since GANs can be used to detect anomalies on a wide range of domains, but all the analyzed architectures focused mostly on images.
+GANは広い範囲のドメインで異常を検出するために使用することができるので、サンプルと画像という用語は互換的に使用されるが、分析されたすべてのアーキテクチャはほとんどが画像に焦点を当てていた。
+
+
+AnoGAN
+
+
+
+
+AnoGAN aim is to use a standard GAN, trained only on positive samples, to learn a mapping from the latent space representation z to the realistic sample ˆx = G(z) and use this learned representation to map new, unseen, samples back to the latent space. 
+AnoGANの目的は、正のサンプルでのみ訓練された標準的なGANを使用して、潜在空間表現zから現実的なサンプルへの写像を学習し、この学習された表現を使用して、新しい、目に見えないサンプルを潜在空間に写像することです。
+
+
+Training a GAN on normal samples only, makes the generator learn the manifold X of normal samples. 
+正規サンプルのみでGANを学習すると、生成器は正規サンプルの多様体Xを学習します。
+
+
+Given that the generator learns how to generate normal samples, when an anomalous image is encoded its reconstruction will be non-anomalous; hence the difference between the input and the reconstructed image will highlight the anomalies. 
+ジェネレータが正常サンプルの生成方法を学習すると、異常画像が符号化されたとき、その再構成は非異常となり、入力画像と再構成画像の差が異常を強調することになります。
+
+The two steps of training and detecting anomalies are summarized in Figure 2.
+図2は、学習と異常検出の2つのステップをまとめたものです。
+
+
+The authors have defined the mapping of input samples to the latent space as an iterative process. 
+著者らは、入力サンプルの潜在空間へのマッピングを反復処理と定義しています。
+
+The aim is to find a point z in the latent space that corresponds to a generated value G(z) that is similar to the query value x located on the manifold X of the positive samples. 
+目的は、正のサンプルの多様体X上にある問い合わせ値xと類似した生成値G(z)に対応する潜在空間の点zを見つけることである。
+
+The research process is defined as the minimization trough γ = 1, 2, . . . , Γ backpropagation steps of the loss function defined as the weighted sum of the residual loss LR and discriminator loss LD, in the spirit of Yeh et al. (2016).
+研究プロセスは、最小化トラフγ=1, 2, ...として定義されます。Yehら(2016)の精神に基づき、残留損失LRと識別損失LDの加重和として定義された損失関数のΓバックプロパゲーションステップとして定義される。
+
+The residual loss measures the dissimilarity between the query sample and the generated sample in the input domain space.
+残差損失は、入力領域空間における問い合わせサンプルと生成サンプルの間の非類似度を測定する。
+
+The discriminator loss takes into account the discriminator response. 
+判別器損失は判別器応答を考慮する．
+
+
+
+
+
+It can be formalized in two different ways. 
+これは、2つの異なる方法で形式化することができる。
+
+Following the original idea of Yeh et al. (2016), hence feeding the generated image G(zγ) into the discriminator and calculating the sigmoid cross-entropy as in the adversarial training phase: this takes into account the discriminator confidence that the input sample is derived by the real data distribution.
+Yeh et al. (2016)のオリジナルのアイデアに従って、生成された画像G(zγ)を判別器に入力し、敵対的訓練段階と同様にシグモイド交雑エントロピーを計算する：これは、入力サンプルが実データ分布から得られるという判別器の信頼度を考慮に入れる。
+
+Alternatively, using the idea introduced by Salimans et al. (2016), and used by the AnoGAN (Schlegl et al., 2017) authors, to compute the feature matching loss, extracting features from a discriminator layer f in order to take into account if the generated sample has similar features of the input one, by computing:
+あるいは、Salimansら(2016)によって導入され、AnoGAN (Schleglら, 2017)の著者によって使用されたアイデアを使用して、特徴一致損失を計算するために、生成されたサンプルが入力サンプルと類似した特徴を持つかどうかを考慮に入れるために、識別器層fから特徴を抽出します。
+
+
+
+
+hence the proposed loss function is.
+したがって、提案された損失関数は次のようになります。
+
+
+Its value at the Γ-th step coincides with the anomaly score formulation:
+Γ-thステップにおけるその値は、異常スコアの定式化と一致する。
+
+
+
+A(x) has no upper bound; to high values correspond an high probability of x to be anomalous.
+A(x) には上限がなく、値が高いほど x が高い確率で異常であることを示します。
+
+It should be noted that the minimization process is required for every single input sample x
+最小化処理は、入力サンプル x ごとに必要であることに注意してください。
+
+
+PROS AND CONS
+
+Pros
+• Showed that GANs can be used for anomaly detection.
+- GANが異常検出に利用できることを示した。
+
+• Introduced a new mapping scheme from latent space to input data space.
+- 潜在空間から入力データ空間へのマッピングスキームを導入した。
+
+• Used the same mapping scheme to define an anomaly score.
+- アノマリースコアを定義するために同じマッピングスキームを使用しました。
+
+Cons
+
+• Requires Γ optimization steps for every new input: bad test-time performance.
+- 新しい入力ごとにΓ最適化ステップを必要とする: テスト時間のパフォーマンスが悪い。
+
+• The GAN objective has not been modified to take into account the need for the inverse mapping learning.
+- GANの目的は逆マッピング学習の必要性を考慮して修正されていません。
+
+• The anomaly score is difficult to interpret, not being in the probability range.
+- 異常スコアは確率範囲内ではなく、解釈が難しい。
+
+
+
+
+. EGBAD
+
+Efficient GAN-Based Anomaly Detection (EGBAD) (Zenati et al., 2018) brings the BiGAN architecture to the anomaly detection domain. 
+Efficient GAN-Based Anomaly Detection (EGBAD) (Zenati et al., 2018)は、BiGANアーキテクチャを異常検出領域にもたらす。
+
+In particular, EGBAD tries to solve the AnoGAN disadvantages using Donahue et al. (2016) and Dumoulin et al. (2017) works that allows learning an encoder E able to map input samples to their latent representation during the adversarial training. 
+特に、EGBADは、Donahueら(2016)およびDumoulinら(2017)の著作を用いて、敵対的訓練の間に入力サンプルをその潜在表現にマッピングすることができるエンコーダEを学習することを可能にすることで、AnoGANの欠点を解決しようとする。
+
+The importance of learning E jointly with G is strongly emphasized, hence Zenati et al. (2018) adopted a strategy similar to the one indicated in Donahue et al. (2016) and Dumoulin et al. (2017) in order to try to solve, during training, the optimization problem minG,E maxD V (D, E, G) where V (D, E, G) is defined as in Equation 3. 
+EをGと共同で学習することの重要性が強く強調されているため、Zenatiら（2018）は、最適化問題minG,E maxD V (D,E,G)を学習中に解こうとするために、Donahueら（2016）およびDumoulinら（2017）で示されたものと同様の戦略を採用した（ここで、V (D,E,G)は式3のように定義される）。
+
+The main contribution of the EGBAD is to allow computing the anomaly score without Γ optimization steps during the inference as it happens in AnoGAN (Schlegl et al., 2017).
+ＥＧＢＡＤの主な貢献は、ＡｎｏＧＡＮ（Ｓｃｈｌｅｇｌら、２０１７）で起こるように、推論中にΓ最適化ステップなしでアノマリースコアを計算できるようにすることである。
+
+
+
+GANomaly
+
+Akcay et al. (2018) introduce the GANomaly approach. 
+Akcayら(2018)はGANomalyアプローチを紹介しています。
+
+Inspired by AnoGAN (Schlegl et al., 2017), BiGAN (Donahue et al., 2016) and EGBAD (Zenati et al., 2018) they train a generator network on normal samples to learn their manifold X while at the same time an autoencoder is trained to learn how to encode the images in their latent representation efficiently. 
+AnoGAN（Schleglら、2017）、BiGAN（Donahueら、2016）、およびEGBAD（Zenatiら、2018）に触発されて、彼らは、それらのマニホールドXを学習するために正常なサンプル上でジェネレーターネットワークを訓練すると同時に、それらの潜在表現における画像を効率的に符号化する方法を学習するためにオートエンコーダーを訓練する。
+
+Their work is intended to improve the ideas of Schlegl et al. (2017), Donahue et al. (2016) and Zenati et al. (2018). 
+彼らの作業は、Schleglら(2017)、Donahueら(2016)、Zenatiら(2018)のアイデアを改善することを目的としている。
+
+Their approach only needs a generator and a discriminator as in a standard GAN architecture.
+彼らのアプローチは、標準的なGANアーキテクチャと同様に、生成器と識別器だけを必要とする。
+
+Generator network The generator network consists of three elements in series, an encoder GE a decoder GD (both assembling an autoencoder structure) and another encoder E. 
+ジェネレータネットワーク ジェネレータネットワークは、直列に配置された 3 つの要素、エンコーダ GE、デコーダ GD（両方ともオートエン コーダ構造を組み立てる）、および別のエンコーダ E で構成されています。
+
+The architecture of the two encoders is the same.
+2 つのエンコーダのアーキテクチャは同じです。
+
+GE takes in input an image x and outputs an encoded version z of it. 
+GE は画像 x を入力として受け取り、その画像の符号化されたバージョン z を出力します。
+
+Hence, z is the input of GD that outputs ˆx, the reconstructed version of x. 
+したがって、zはGDの入力であり、xの再構成版であるˆxを出力します。
+
+Finally, ˆx is given as an input to the encoder E that produces ˆz. 
+最後に、ˆxはエンコーダEへの入力として与えられ、ˆzを生成します。
+
+
+There are two main contributions from this architecture. 
+このアーキテクチャからの主な貢献は2つある。
+
+First, the operating principle of the anomaly detection of this work lies in the autoencoder structure. 
+第一に、本研究の異常検出の動作原理はオートエンコーダー構造にあります。
+
+Given that we learn to encode normal (non-anomalous) data (producing z) and given that we learn to generate normal data (ˆx) starting from the encoded representation z, when the input data x is an anomaly its reconstruction will be normal. 
+正常な（非異常な）データを符号化することを学習し（zを生成する）、符号化された表現zから正常なデータ（ˆx）を生成することを学習すると、入力データxが異常な場合、その再構成は正常になります。
+
+Because the generator will always produce a non-anomalous image, the visual difference between the input x and the produced ˆx will be high and in particular will spatially highlight where the anomalies are located. 
+生成器は常に非異常画像を生成するので、入力ｘと生成されたˆx との間の視覚的な差は大きく、特に、異常がどこにあるかを空間的に強調する。
+
+Second, the encoder E at the end of the generator structure helps, during the training phase, to learn to encode the images in order to have the best possible representation of x that could lead to its reconstruction ˆx.
+第二に、生成器の構造の最後にあるエンコーダEは、訓練段階で、その再構成ˆxにつながる可能性のあるxの最良の表現を持つために、画像を符号化することを学習するのに役立ちます。
+
+Discriminator network The discriminator network D is the other part of the whole architecture, and it is, with the generator part, the other building block of the standard GAN architecture. 
+識別器ネットワーク 識別器ネットワークDは、アーキテクチャ全体のもう一つの部分であり、生成器の部分とともに、標準GANアーキテクチャのもう一つの構成要素です。
+
+
+The discriminator, in the standard adversarial training, is trained to discern between real and generated data. 
+識別器は、標準的な敵対的訓練では、実データと生成データの間を識別するように訓練される。
+
+When it is not able to discern among them, it means that the generator produces realistic images. 
+識別器が実データと生成データの間を識別できない場合、それは生成器が現実的な画像を生成していることを意味します。
+
+The generator is continuously updated to fool the discriminator. 
+生成器は、識別器を欺くために継続的に更新される。
+
+
+
+Refer to Figure 3 for a visual representation of the architecture underpinning GANomaly.
+GANomalyを支えるアーキテクチャの視覚的な表現については、図3を参照してください。
+
+The GANomaly architecture differs from AnoGAN (Schlegl et al., 2017) and from EGBAD (Zenati et al., 2018). 
+GANomalyのアーキテクチャは、AnoGAN(Schleglら、2017)とEGBAD(Zenatiら、2018)とは異なる。
+
+In Figure 4 the three architectures are presented.
+図4では、3つのアーキテクチャが示されている。
+
+Beside these two networks, the other main contribution of GANomaly is the introduction of the generator loss as the sum of three different losses; the discriminator loss is the classical discriminator GAN loss.
+これらの2つのネットワークの横に、GANomalyの他の主な貢献は、3つの異なる損失の合計としてのジェネレーター損失の導入である；判別器損失は古典的な判別器GAN損失である。
+
+Generator loss The objective function is formulated by combining three loss functions, each of which optimizes a different part of the whole architecture.
+ジェネレータ損失 目的関数は、3つの損失関数を組み合わせて定式化され、それぞれがアーキテクチャ全体の異なる部分を最適化します。
+
+Adversarial Loss The adversarial loss it is chosen to be the feature matching loss as introduced in Schlegl et al. (2017) and pursued in Zenati et al. (2018):
+アドバーサリアル損失 Schleglら(2017)で紹介され、Zenatiら(2018)で追求されているような特徴一致損失を選択します。
+
+
+where f is a layer of the discriminator D, used to extract a feature representation of the input . 
+ここで f は，入力の特徴表現を抽出するために使用される識別器 D の層である．
+
+
+Alternatively, binary cross entropy loss can be used.
+あるいは、二値クロスエントロピー損失を使用することもできます。
+
+
+Contextual Loss Through the use of this loss the generator learns contextual information about the input data. 
+文脈損失 この損失を使用することで，生成器は入力データに関する文脈情報を学習します．
+
+
+As shown in (Isola et al., 2016) the use of the L1 norm helps to obtain better visual results:
+(Isola et al., 2016)に示されているように、L1ノルムの使用は、より良い視覚的な結果を得るのに役立つ。
+
+
+
+Encoder Loss This loss is used to let the generator network learn how to best encode a normal (non-anomalous) image:
+エンコーダ損失 この損失は、正常な（異常でない）画像を最適にエンコードする方法をジェネレータネットワークに学習させるために使用されます。
+
+
+The resulting generator loss will be the result of the (weighted) sum of the three previously defined losses:
+結果として得られる発電機損失は、以前に定義された3つの損失の（重み付けされた）合計の結果となる。
+
+where wadv, wcon and wenc are weighting parameters used to adjust the importance of the three losses.
+ここで、wadv、wcon、wencは3つの損失の重要度を調整するための重み付けパラメータである。
+
+At test stage, the authors proposed to compute the anomaly score in a different way respect to AnoGAN: only using using Lenc:
+テスト段階では、著者らはAnoGANとは異なる方法で異常スコアを計算することを提案しました。
+
+
+
+
+
+In order to make the anomaly score easier to interpret, they proposed to compute the anomaly score for every sample ˆx in the test set ˆD, getting a set of individual anomaly scores:
+異常スコアの解釈を容易にするために、試験集合ˆD の各標本 ˆx について異常スコアを計算し、個々の異常スコアの集合を得ることを提案しました。
+
+S = si : A(ˆxi) , ˆxi ∈ ˆD
+and then apply feature scaling to have the anomaly scores within the probabilistic range of [0, 1]:
+そして、異常スコアが[0, 1]の確率的範囲内になるように特徴量のスケーリングを適用します。
+
+
+
+PROS AND CONS
+
+Pros
+
+
+• An encoder is learned during the training process, hence we don’t have the need for a research process as in AnoGAN (Schlegl et al., 2017).
+- エンコーダは学習プロセス中に学習されるため、AnoGAN（Schleglら、2017）のような研究プロセスは必要ありません。
+
+• Using an autoencoder like architecture (no use of noise prior) makes the entire learning process faster.
+- オートエンコーダーのようなアーキテクチャを使用すると（ノイズの事前処理を使用しない）、学習プロセス全体が速くなります。
+
+• The anomaly score is easier to interpret.
+- アノマリースコアの解釈が容易になる。
+
+• The contextual loss can be used to localize the anomaly.
+- コンテクストロスは、異常値を局所化するために使用することができる。
+
+
+Cons
+
+• It allows to detect anomalies both in the image space and in the latent space, but the results couldn’t match:
+- これにより，画像空間と潜在空間の両方で異常を検出することができますが，結果は一致しませんでした．
+
+a higher anomaly score, that’s computed only in the latent space, can be associated with a generated sample with a low contextual loss value and thus very similar to the input - and vice versa.
+潜在空間のみで計算された高い異常スコアは，文脈上の損失値が低く，入力と非常に類似している生成サンプルと関連付けることができます．
+
+• Defines a new anomaly score.
+- 新しい異常値スコアを定義します．
+
+
+
+
+
+
+Experiments
+
+To evaluate the performance of every Anomaly Detection algorithm described we re-implemented all of them using the popular deep learning framework Tensorflow (Abadi et al., 2015) creating a publicly available toolbox for the Anomaly Detection with GANs.
+記載されているすべての異常検出アルゴリズムの性能を評価するために、GANを用いた異常検出のための一般に利用可能なツールボックスを作成する人気のあるディープラーニングフレームワークTensorflow (Abadi et al., 2015)を使用して、それらのすべてを再実装しました。
+
+Experiments were made trying to improve, where possible (i.e., where there were known errors communicated directly by the authors), the code. 
+実験は、可能であれば（すなわち、著者によって直接伝達された既知のエラーがあった場合）、コードを改善しようとして行われました。
+
+The results shown in the following sections are the best empirically obtained among all the tests carried out and do not necessarily derive from the configurations of the networks that at a theoretical level should be the correct ones. 
+以下のセクションで示される結果は, 実施されたすべてのテストの中で経験的に得られた最良のものであり, 理論的なレベルで正しいものであるべきネットワークの構成から必ずしも導き出されたものではない. 
+
+In particular, as described in Appendix A, in version 1 (Appendix A.1) of our tests, with the correct implementation of the BiGAN/EGBAD models, we obtained worse results than those obtained in version 2 (Appendix A.2) of our tests with the architecture already implemented in the reference paper, although this contained known errors.
+特に、付録Aで述べたように、我々のテストのバージョン1(付録A.1)では、BiGAN/EGBADモデルの正しい実装では、既知のエラーが含まれていたにもかかわらず、参考文献ですでに実装されているアーキテクチャを用いたテストのバージョン2(付録A.2)で得られた結果よりも悪い結果が得られました。
+
+
+
+Experimental setup
+
+The experiments are performed using a Intel R ⃝ Core TM i7- 7820X CPU and NVIDIA R ⃝ GTX 1080 Ti.
+実験には、CPUにIntel R ⃝ Core TM i7-7820X、NVIDIA R ⃝ GTX 1080 Tiを使用。
+
+
+
+. DATASETS
+
+We decided to train and test on widely known datasets commonly found in the literature: MNIST (LeCun & Cortes, 2010a), FashionMNIST (Xiao et al., 2017), CIFAR-10 (Krizhevsky et al., 2007), and KDD99 (Lichman, 1999).
+我々は、文献に一般的に見られる広く知られたデータセットを用いてトレーニングとテストを行うことにした。MNIST（LeCun & Cortes, 2010a）、FashionMNIST（Xiaoら, 2017）、CIFAR-10（Krizhevskyら, 2007）、およびKDD99（Lichman, 1999）である。
+
+
+
+MNIST: 
+
+MNIST dataset (LeCun & Cortes, 2010b) is a database of handwritten digits. 
+MNISTデータセット(LeCun & Cortes, 2010b)は手書き数字のデータベースである。
+
+It consists of 28 × 28 pixels grayscale images split in a training set of 60,000 examples and a test set of 10,000 examples. 
+28×28ピクセルのグレースケール画像を6万例のトレーニングセットと1万例のテストセットに分割して構成されています。
+
+The output classes are 10 in total and represent the ten digits from 0 to 9. 
+出力クラスは合計10個で、0から9までの10桁の数字を表現しています。
+
+In order to replicate the results of the papers presented in this work, the training process and the subsequent testing phase have been evaluated on each class, i.e., one at a time, only one class has been considered as the anomaly class, and the remaining nine classes have been considered together as the normal data.
+本研究で発表された論文の結果を再現するために、学習プロセスとそれに続くテスト段階では、各クラスについて評価を行った。
+
+
+
+Fashion MNIST: 
+
+Fashion-MNIST dataset (Xiao et al., 2017) is a dataset intended to be a more complex dropin replacement for the traditional MNIST dataset, developed by Zalando R ⃝ Research Group. 
+ファッションMNISTデータセット(Xiao et al., 2017)は、Zalando R ⃝研究グループによって開発された従来のMNISTデータセットのより複雑なドロップインの代替となることを意図したデータセットである。
+
+It shares with the MNIST dataset the same image size and train-test split; it consists of 28 × 28 pixels images split in a training set of 60,000 examples and a test set of 10,000 examples. 
+これはMNISTデータセットと同じ画像サイズと訓練-テスト分割を共有しており、28×28ピクセルの画像を60,000例の訓練セットと10,000例のテストセットに分割したものである。
+
+Each image is a grayscale image associated, as the MNIST dataset, with a label from 10 classes, from 0 to 9. 
+各画像は，MNISTデータセットと同様にグレースケール画像であり，0から9までの10のクラスのラベルが付与されている．
+
+Each example represents a different item of clothing. 
+それぞれの例は，異なる衣服のアイテムを表している．
+
+As for the MNIST dataset, the training and the following test phase were conducted on each class, one at a time.
+MNISTデータセットと同様に，クラスごとに1つずつ学習と次のテストを行った．
+
+
+
+CIFAR-10: 
+
+A dataset of tiny images of various subjects, CIFAR-10 consists of 60000 32 × 32 color images in 10 classes, with 6000 images per class. 
+様々な被写体の微小画像のデータセットであるCIFAR-10は、32×32のカラー画像60000枚を10クラスに分け、1クラスあたり6000枚の画像で構成されています。
+
+There are 50000 training images and 10000 test images.
+トレーニング画像は50000枚、テスト画像は10000枚です。
+
+KDD: 
+
+
+KDD dataset (Lichman, 1999) consists in a collection of network intrusion detection data, this is the data set used for The Third International Knowledge Discovery and Data Mining Tools Competition held in conjunction with KDD-99 The Fifth International Conference on Knowledge Discovery and Data Mining. 
+KDDデータセット(Lichman, 1999)は、ネットワーク侵入検知データのコレクションで構成されており、これは、KDD-99 The Fifth International Conference on Knowledge Discovery and Data Miningと連動して開催されたThe Third International Knowledge Discovery and Data Mining Tools Competitionで使用されたデータセットです。
+
+The competition task was to build a network intrusion detector, a predictive model capable of distinguishing between “bad” connections, called intrusions or attacks, and “good” normal connections. 
+コンペの課題は、侵入や攻撃と呼ばれる「悪い」接続と「良い」通常の接続を区別できる予測モデルであるネットワーク侵入検知器を構築することでした。
+
+All the examples are string tuples or numbers. 
+例はすべて文字列のタプルや数字である。
+
+Given the considerable amount of data inside the data set, we used as in (Zenati et al., 2018), the KDDCUP99 10 percent version of the data set. 
+データセット内のデータ量がかなり多いことを考えると、(Zenati et al., 2018)と同様に、KDDCUP99の10%バージョンを使用しました。
+
+Since the anomalies are in a higher percentage than normal data, the normal ones have been considered as anomalies.
+通常のデータよりも高い割合で異常が発生しているため、通常のものを異常とみなしました。
+
+
+
+
+METHODOLOGY
+
+We follow the same methodology employed by Zenati et al. in the official code accompanying Zenati et al. (2018).
+我々は、Zenati et al. (2018)に付随する公式コードでZenati et al.が採用したのと同じ方法論に従う。
+
+We start by getting all the dataset together (train and test split). 
+我々は、すべてのデータセットを一緒に取得することから始めます（訓練とテストの分割）。
+
+Starting from this one big pool of examples, we choose one class as an anomaly and, after shuffling the dataset, we then create a training set by using 80% of the whole data while the remaining 20% is used for the testing set, this process is repeated for all the classes in the dataset.
+この1つの大きな例のプールから始めて、我々は1つのクラスを異常値として選択し、データセットをシャッフルした後、我々は全体のデータの80%を使用してトレーニングセットを作成し、残りの20%はテストセットに使用され、このプロセスは、データセット内のすべてのクラスに対して繰り返されます。
+
+Each model is trained accordingly to its original implementation on the training set and is tested on the whole dataset made up of both regular and anomalous data.
+各モデルは訓練セットの元の実装に応じて訓練され、正規データと異常データの両方からなるデータセット全体でテストされます。
+
+
+
+
+
+
+Results
+
+All tests have been made measuring the area under precision and recall curve (AUPRC). 
+すべての試験は、精度とリコール曲線（AUPRC）の下の面積を測定しています。
+
+For a complete understanding of all the results, please refer to Appendix A. 
+すべての結果の完全な理解については、付録Aを参照してください。
+
+Our fully static-Tensorflow implementation (i.e., only Tensorflow framework has been used, we relied upon neither Keras nor eager execution) produced different results from the one depicted in the original Donahue et al. (2016), Schlegl et al. (2017), and Akcay et al. (2018) papers. 
+我々の完全に静的なTensorflow実装（すなわち、Tensorflowフレームワークのみが使用されており、我々はKerasやEager実行に依存していない）は、オリジナルのDonahueら（2016）、Schleglら（2017）、およびAkcayら（2018）の論文で描かれているものとは異なる結果をもたらした。
+
+The tests have been made by training the GAN networks with different hyper-parameters configurations in order to test a broader range of models configurations. 
+テストは、モデル構成のより広い範囲をテストするために、異なるハイパーパラメータ構成でGANネットワークを訓練することによって行われてきた。
+
+Moreover, following the GANomaly approach, we have added an evaluation process to make model selection and thus select the best model during the training phase. 
+さらに、GANomalyのアプローチに従い、モデル選択を行うための評価プロセスを追加し、その結果、訓練段階で最適なモデルを選択した。
+
+The model selection has been made for BiGAN and GANomaly, since doing it for AnoGAN would be unfeasible, due to the Γ research steps required for every sample at test-time. 
+モデル選択はBiGANとGANomalyのために行われています。なぜなら、AnoGANのためにそれを行うことは、テスト時にサンプルごとに必要とされるΓの研究ステップのために実現不可能だからです。
+
+We intentionally left out the performance evaluation of the AnoGAN model. 
+AnoGANモデルの性能評価を意図的に省いています。
+
+Due to the inner workings of the architecture that should have required a very long time to be tested because of the necessity to find, every time and for every image taken into consideration, the best latent representation, meaning that for every image we would need 500 training step (500 it is an empirical value found in the original paper (Schlegl et al., 2017)). 
+すべての画像のために我々は500のトレーニングステップ（500それは元の論文（Schleglら、2017）で見つかった経験値であることを意味し、すべての時間と考慮に入れたすべての画像のために、最高の潜在表現を、見つけるために必要性のためにテストするために非常に長い時間を必要としているはずのアーキテクチャの内部の仕組みのために（500）。
+
+Following, the training and test methods are described. 
+以下に、学習方法とテスト方法を説明します。
+
+A summary of the results is present in Figure 5 for the MNIST and Fashion-MNIST dataset, and in Table 3 for the KDD results.
+結果の概要は、MNISTとFashion-MNISTデータセットについては図5に、KDDの結果については表3に示されている。
+
+
+
+
+BiGAN/EGBAD: 
+
+With BiGAN/EGBAD (Zenati et al., 2018) architecture we have executed the highest number of training and testing configurations, this means we have performed, for every label the combinations depicted in Table 1. 
+BiGAN/EGBAD (Zenati et al., 2018)アーキテクチャでは、最も多くのトレーニングとテスト構成を実行しました。
+
+To better understand what the table shows, taking the first row (Case 1) as an example, we are describing the case where, during the training phase, a Binary Cross Entropy loss (BCE) in combination with a Residual loss has been used and, during the testing phase, we computed the anomaly score twice, using the feature matching (FM) and the BCE. 
+表が何を示しているかをよりよく理解するために、最初の行（ケース1）を例にとると、我々は、トレーニングフェーズの間に、残留損失と組み合わせたバイナリクロスエントロピー損失（BCE）が使用され、テストフェーズの間に、特徴照合（FM）とBCEを使用して、2回の異常スコアを計算した場合を記述しています。
+
+All the other cases should be clear. 
+それ以外の場合はすべて明らかにする必要があります。
+
+In particular, during the training phase, the choice between using BCE or FM influences only the generator loss. 
+特に訓練段階では、BCEを使用するかFMを使用するかの選択は、発生器損失のみに影響を与える。
+
+The residual loss that it is intended as the difference between the original image and the image reconstructed by the generator starting from a latent representation (please refer to Equation (4)) when used has been added as an additional term to the BCE loss of the encoder. 
+使用した場合の原画像と潜在表現（式（４）参照）を起点とした生成器で再構成された画像との差を意図した残差損失が、エンコーダのＢＣＥ損失に追加項として追加されている。
+
+In Figure 5 is possible to see the results on the MNIST and Fashion-MNIST datasets. 
+図5では、MNISTとFashion-MNISTのデータセットでの結果を見ることができます。
+
+In Appendix A it is possible to see the complete results. 
+付録Aでは完全な結果を見ることができます。
+
+The images used are the original 28 × 28 images. 
+使用した画像は元の28×28の画像である。
+
+Any additional result from multiple different tests performed with different random seeds has been omitted for the sake of clarity.
+異なるランダムシードを用いて実行された複数の異なるテストからの追加の結果は、わかりやすくするために省略しています。
+
+
+
+GANomaly: 
+
+GANomaly training and testing have been done similarly to the previously described BiGAN/EGBAD architecture. 
+GANomalyのトレーニングとテストは、以前に説明したBiGAN/EGBADアーキテクチャと同様に行われました。
+
+The whole procedure is leaner here, with only the combinations shown in Table 2.
+ここでは、表2に示されている組み合わせのみを使用して、全体の手順をよりリーンにしています。
+
+We added a step of model selection during the training phase in order to always save the very best model. 
+我々は、常に最良のモデルを保存するために、訓練段階でモデル選択のステップを追加しました。
+
+For this architecture, the testing phase has been done using an anomaly score equal to the squared difference between the latent representations of the image encoded first with autoencoder part of the network and, after being reconstructed, encoded again with the encoder. 
+このアーキテクチャでは、テスト段階では、ネットワークのオートエンコーダー部分で最初にエンコードされた画像の潜在表現と、再構成された後に再度エンコーダーでエンコードされた画像の間の二乗の差に等しい異常スコアを使用して行われました。
+
+To briefly review the working of GANomaly, see Figure 3. 
+GANomalyの動作を簡単に確認するために、図3を参照してください。
+
+The images used are the original ones resized to 32 × 32. 
+使用している画像は、元の画像を32×32にリサイズしたものです。
+
+Refer to the plot on the right of Figure 5 to a brief summary of the results on MNIST and Fashion-MNIST datasets and on Table 3 for the results on KDD dataset.
+図5の右のプロットを参照して、MNISTとFashion-MNISTのデータセットでの結果の簡単な要約を、またKDDのデータセットでの結果については表3を参照してください。
+
+AnoGAN: 
+
+As previously stated, the results of AnoGAN have not been reproduced due to the onerous computational requirements causing the train and test phases to be intensively time-consuming. 
+前述のように、AnoGAN の結果は、訓練とテストフェーズに集中的に時間を費やすことを引き起こす負荷の高い計算要件のために再現されていません。
+
+The reader could refer to the original paper (Schlegl et al., 2017) to an overview of the results.
+読者は、結果の概要については、元の論文(Schlegl et al., 2017)を参照することができます。
+
+
+
+
+
+Conclusions
+
+We implemented and evaluated the state-of-the-art algorithms for anomaly detection based on GANs. 
+本研究では、GANに基づく異常検知のための最先端のアルゴリズムを実装し、評価を行った。
+
+In this work, we unified the three major works under the same framework (Tensorflow) and within the same code-base. 
+本研究では、3つの主要な研究を同じフレームワーク(Tensorflow)と同じコードベースで統一した。
+
+The analysis and implementation of the algorithms allowed us to verify the effectiveness of the GANs-based approach to the anomaly detection problem and, at the same time, highlight the differences between the original papers and the publicly available code. 
+アルゴリズムの分析と実装により、異常検知問題に対するGANsベースのアプローチの有効性を検証すると同時に、オリジナルの論文と一般に公開されているコードとの違いを強調することができました。
+
+Besides, to test the feasibility of the architectures mentioned above, this work intends to provide a modular and ready-to-go solution for everyone desiring an anomaly detection toolkit working out of the box.
+さらに、上記のアーキテクチャの実現可能性をテストするために、本研究では、異常検出ツールキットを必要とするすべての人に、すぐに使えるモジュール式のソリューションを提供することを意図しています。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
