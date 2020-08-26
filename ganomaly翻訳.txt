@@ -1,0 +1,855 @@
+Abstract. 
+Anomaly detection is a classical problem in computer vision,namely the determination of the normal from the abnormal when datasets are highly biased towards one class (normal) due to the insufficient sample size of the other class (abnormal). 
+異常検出は、コンピュータビジョンの古典的な問題、すなわち、他のクラス（異常）のサンプルサイズが不足しているために、データセットが一方のクラス（正常）に大きく偏っている場合に、異常から正常を判断することです。
+While this can be addressed as a supervised learning problem, a signicantly more challenging problem is that of detecting the unknown/unseen anomaly case that takes us instead into the space of a one-class, semi-supervised learning paradigm. 
+これは教師付き学習の問題として扱うことができますが、より困難な問題は、未知/未知の異常を検出する問題であり、これは1クラスの半教師付き学習パラダイムの空間に私たちを連れて行きます。
+We introduce such a novel anomaly detection model, by using a conditional generative adversarial network that jointly learns the generation of high-dimensional image space and the inference of latent space.
+本研究では、高次元画像空間の生成と潜在空間の推論を共同で学習する条件付き生成逆説ネットワークを用いて、このような新しい異常検出モデルを紹介する。
+Employing encoder-decoder-encoder sub-networks in the generator network enables the model to map the input image to a lower dimension vector, which is then used to reconstruct the generated output image.
+ジェネレータネットワークでエンコーダ-デコーダ-エンコーダ-エンコーダサブネットワークを使用することで、モデルは入力画像を低次元ベクトルにマッピングし、生成された出力画像を再構築するために使用することができます。
+
+The use of the additional encoder network maps this generated image to its latent representation. 
+追加のエンコーダネットワークを使用することで、この生成された画像をその潜在的な表現にマッピングします。
+
+Minimizing the distance between these images and the latent vectors during training aids in learning the data distribution for the normal samples. 
+学習中にこれらの画像と潜在ベクトルの間の距離を最小化することは、正規サンプルのデータ分布を学習する際に役立ちます。
+
+As a result, a larger distance metric from this learned data distribution at inference time is indicative of an outlier from that distribution [an anomaly]. 
+その結果、推論時にこの学習データ分布からの距離メトリックが大きくなることは、その分布からの外れ値[異常値]を示していることになります。
+
+Experimentation over several benchmark datasets, from varying domains, shows the model efficacy and superiority over previous state-of-the-art approaches.
+さまざまな領域のいくつかのベンチマークデータセットを用いて実験を行った結果、モデルの有効性と、これまでの最先端のアプローチよりも優れていることがわかりました。
+
+
+
+
+
+
+
+
+
+
+
+
+
+Despite yielding encouraging performance over various computer vision tasks, supervised approaches heavily depend on large, labeled datasets. 
+様々なコンピュータビジョンのタスクでは、優れた性能を発揮しますが、教師付きアプローチは、ラベル付きの大規模なデータセットに大きく依存しています。
+In many of the real world problems, however, samples from the more unusual classes of interest are of insufficient sizes to be effectively modeled.
+しかし、実世界の多くの問題では、関心のあるより珍しいクラスのサンプルは、効果的にモデル化するには十分なサイズではありません。
+
+Instead, the task of anomaly detection is to be able to identify such cases, by training only on samples considered to be normal and then identifying these unusual, insufficiently available samples (abnormal) that differ from the learned sample distribution of normality.
+その代わり、正常と思われるサンプルのみを学習し、学習した正常のサンプル分布とは異なる、これらの異常で十分に利用できないサンプル（異常）を特定することで、このようなケースを特定できるようにするのが異常検出の課題である。
+
+For example a tangible application, that is considered here within our evaluation, is that of X-ray screening for aviation or border security where anomalous items posing a security threat are not commonly encountered, exemplary data of such can be difficult to obtain in any quantity, and the nature of any anomaly posing a potential threat may evolve due to a range of external factors. However, within this challenging context, human security operators are still competent and adaptable anomaly detectors against new and emerging anomalous threat signatures.
+例えば、私たちの評価の中でここで検討されている具体的な用途としては、セキュリティ上の脅威となるような異常物が一般的には遭遇しない、そのような例示的なデータの入手が困難である、そして潜在的な脅威となるような異常の性質は、様々な外部要因によって変化する可能性がある、航空や国境警備のためのX線スクリーニングが挙げられます。しかし、このような困難な状況下でも、人間のセキュリティオペレータは、新しく出現した異常な脅威のシグネチャに対して、有能で適応力のある異常検知器であることに変わりはありません。
+
+As illustrated in Figure 1, a formal problem denition of the anomaly detection task is as follows: given a dataset D containing a large number of normal samples X for training, and relatively few abnormal examples Xhat for the test, a model f is optimized over its parameters THETA. 
+図1に示すように、異常検出タスクの形式的な問題定義は次のようになります：学習用の多数の正常サンプルXとテスト用の比較的少数の異常サンプルXhatを含むデータセットDが与えられた場合、モデルfはそのパラメータTHETAにわたって最適化されます。
+
+
+
+f learns the data distribution pX of the normal samples during training while identifying abnormal samples as outliers during testing by outputting an anomaly score A(x), where x is a given test example. 
+fは、学習時には正常サンプルのデータ分布pXを学習し、テスト時には異常サンプルを外れ値として識別し、異常スコアA(x)を出力することで、xは与えられたテスト例である。
+
+A Larger A(x) indicates possible abnormalities within the test image since f learns to minimize the output score during training. 
+より大きなA(x)は、学習中にfが出力スコアを最小化するように学習するので、テスト画像内に異常がある可能性があることを示しています。
+
+
+A(x) is general in that it can detect unseen anomalies as being non-conforming to pX.
+A(x)は、pXに不適合なものとして見られない異常を検出できるという点で一般的である。
+
+There is a large volume of studies proposing anomaly detection models within various application domains [2{4,23,39].
+様々なアプリケーション領域での異常検知モデルを提案する研究が数多く存在する
+
+Besides, a considerable amount of work taxonomized the approaches within the literature [9, 19, 28, 29, 33]. 
+また、かなりの量の研究が文献の中でアプローチを分類している
+
+In parallel to the recent advances in this eld, Generative Adversarial Networks (GAN) have emerged as a leading methodology across both unsupervised and semi-supervised problems. 
+この分野での最近の進歩と並行して、教師なし問題と半教師付き問題の両方において、GAN（Generative Adversarial Networks）が主要な方法論として浮上してきました。
+
+Goodfellow first proposed this approach by co-training a pair networks (generator and discriminator).
+グッドフェローが最初に提案したのは、ペアネットワーク（生成器と識別器）を共訓練することである。
+
+The former network models high dimensional data from a latent vector to resemble the source data, while the latter distinguishes the modeled (i.e., approximated) and original data samples.
+前者のネットワークは、潜在ベクトルからの高次元データをモデル化してソースデータに類似させ、後者はモデル化された（すなわち、近似された）元のデータサンプルと元のデータサンプルを区別する。
+
+Several approaches followed this work to improve the training and inference stages [8, 17]. 
+この作業に続いて、学習と推論の段階を改善するためのいくつかのアプローチが行われた
+
+As reviewed in [23], adversarial training has also been adopted by recent work within anomaly detection.
+23]で検討したように、最近の研究では、異常検出の分野でも敵対的訓練が採用されています。
+
+
+
+
+
+
+
+
+Fig. 1. 
+Overview of our anomaly detection approach within the context of an X-ray security screening problem. 
+X線セキュリティスクリーニングの問題の中での異常検出アプローチの概要。
+
+Our model is trained on normal samples (a), and tested on normal and abnormal samples (b). 
+我々のモデルは正常サンプル(a)で学習され、正常サンプルと異常サンプル(b)でテストされます。
+
+Anomalies are detected when the output of the model is greater than a certain threshold A(x) > φ.
+モデルの出力がある閾値A(x) > φ.より大きい場合に異常が検出されます。
+
+
+
+
+
+
+
+
+Schlegl et al. [39] hypothesize that the latent vector of a GAN represents the true distribution of the data and remap to the latent vector by optimizing a pre-trained GAN based on the latent vector. 
+Schleglら[39]は、GANの潜在ベクトルがデータの真の分布を表しているという仮説を立て、潜在ベクトルに基づいて事前学習されたGANを最適化することで潜在ベクトルへのリマップを行う。
+
+The limitation is the enormous computational complexity of remapping to this latent vector space. 
+この潜在ベクトル空間へのリマッピングの計算が非常に複雑であることが限界です。
+
+
+
+In a follow-up study, Zenati et al. [40] train a BiGAN model [14], which maps from image space to latent space jointly, and report statistically and computationally superior results albeit on the simplistic MNIST benchmark dataset [25].
+Zenatiら[40]は、画像空間から潜在空間へのマッピングを共同で行うBiGANモデル[14]を学習させ、単純なMNISTベンチマークデータセット[25]ではあるが、統計的にも計算量的にも優れた結果を報告している。
+
+Motivated by [6, 39, 40], here we propose a generic anomaly detection architecture comprising an adversarial training framework. 
+6, 39, 40]に触発されて、ここでは、敵対的訓練フレームワークからなる汎用的な異常検出アーキテクチャを提案する。
+
+In a similar vein to [39], we use single color images as the input to our approach drawn only from an example set of normal (non-anomalous) training examples. 
+39]と同様に、我々のアプローチの入力として単色画像を使用します。
+
+However, in contrast, our approach does not require two-stage training and is both efficient for model training and later inference (run-time testing). 
+しかし、これに対して、我々のアプローチは2段階の訓練を必要とせず、モデルの訓練と後の推論（ランタイムテスト）の両方で効率的である。
+
+As with [40], we also learn image and latent vector spaces jointly. 
+また、[40]と同様に、画像空間と潜在ベクトル空間を共同学習する。
+
+Our key novelty comes from the fact that we employ adversarial autoencoder within an encoder-decoder-encoder pipeline, capturing the training data distribution within both image and latent vector space. 
+我々の主な目新しさは、エンコーダ-デコーダ-エンコーダパイプラインの中で、画像と潜在ベクトル空間の両方で訓練データの分布をキャプチャして、敵対的な自動エンコーダを採用しているという事実に由来しています。
+
+An adversarial training architecture such as this, practically based on only normal training data examples, produces superior performance over challenging benchmark problems. 
+このような敵対的なトレーニング・アーキテクチャは、通常のトレーニング・データ例のみに基づいており、難しいベンチマーク問題よりも優れた性能を発揮します。
+
+The main contributions of this paper are as follows:
+本論文の主な投稿は以下の通りである。
+
+semi-supervised anomaly detection 
+半教師付き異常検出 
+
+a novel adversarial autoencoder within an encoder-decoder-encoder pipeline, capturing the training data distribution within both image and latent vector space, yielding superior results to contemporary GAN-based and traditional autoencoder-based approaches.
+これは、画像と潜在ベクトル空間の両方で学習データの分布をキャプチャし、現代のGANベースのアプローチや従来のオートエンコーダーベースのアプローチよりも優れた結果をもたらす、エンコーダ-デコーダ-エンコーダー-エンコーダーパイプライン内の新しい敵対的オートエンコーダーです。
+
+
+efficacy 
+効き目
+
+an efficient and novel approach to anomaly detection that yields both statistically and computationally better performance.
+統計的にも計算的にも優れた性能を発揮する、効率的で斬新な異常検出のアプローチ。
+
+reproducibility 
+再現性
+
+simple and effective algorithm such that the results could be reproduced via the code1 made publicly available.
+公開されているコード1 を通して結果を再現できるようなシンプルで効果的なアルゴリズムを開発しました。
+https://github.com/samet-akcay/ganomaly
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+2 Related Work
+
+Anomaly detection has long been a question of great interest in a wide range of domains including but not limited to biomedical [39], nancial [3] and security such as video surveillance [23], network systems [4] and fraud detection [2].
+異常検知は、バイオメディカル[39]、金融[3]、ビデオ監視[23]、ネットワークシステム[4]、不正検知[2]などのセキュリティを含む（ただしこれらに限定されない）幅広い分野で、長い間大きな関心を集めてきました。
+
+Besides, a considerable amount of work has been published to taxonomize the approaches in the literature [9, 19, 28, 29, 33]. 
+また、文献の中でアプローチを分類するために、かなりの量の研究が発表されている [9, 19, 28, 29, 33]。
+
+The narrower scope of the review is primarily focused on reconstruction-based anomaly techniques.
+レビューの範囲が狭くなっているのは、主に再構成に基づく異常解析技術に焦点が当てられているからです。
+
+The vast majority of the reconstruction-based approaches have been employed to investigate anomalies in video sequences. 
+再構成に基づくアプローチの大部分は、ビデオシーケンスの異常を調査するために採用されてきました。
+
+Sabokrou et al. [37] investigate the use of Gaussian classiffers on top of autoencoders (global) and nearest neighbor similarity (local) feature descriptors to model non-overlapping video patches. 
+Sabokrouら[37]は、非重複動画パッチをモデル化するために、オートエンコーダー（グローバル）と最近傍類似度（ローカル）特徴記述子の上にガウス分類器を使用することを調査しています。
+
+A study by Medel and Savakis [30] employs convolutional long shortterm memory networks for anomaly detection. 
+MedelとSavakisによる研究[30]では、異常検出のために畳み込み式の長短記憶ネットワークを採用している。
+
+Trained on normal samples only, the model predicts the future frame of possible standard example, which distinguishes the abnormality during the inference. 
+正常なサンプルのみで訓練されたモデルは、推論の間に異常を区別する、可能な標準例の将来のフレームを予測します。
+
+In another study on the same task, Hasan et al. [18] considers a two-stage approach, using local features and fully connected autoencoder rst, followed by fully convolutional autoencoder for end-to-end feature extraction and classication. 
+同じタスクに関する別の研究では、Hasanら[18]は、最初に局所特徴と完全に接続された自動エンコーダーを使用し、その後、エンドツーエンドの特徴抽出と分類のために完全畳み込み自動エンコーダーを使用するという2段階のアプローチを検討している。
+
+Experiments yield competitive results on anomaly detection benchmarks. To determine the effects of adversarial training in anomaly detection in videos, Dimokranitou [13] uses adversarial autoencoders, producing a comparable performance on benchmarks.
+実験では、異常検出のベンチマークで競合する結果が得られます。ビデオの異常検出における敵対的トレーニングの効果を判断するために、Dimokranitou [13] は敵対的オートエンコーダーを使用し、ベンチマークで同等の性能を実現しています。
+
+
+More recent attention in the literature has been focused on the provision of adversarial training. 
+最近の文献では、敵対者訓練の提供に注目が集まっている。
+
+
+The seminal work of Ravanbakhsh et al. [35] utilizes image to image translation [21] to examine the abnormality detection problem in crowded scenes and achieves state-of-the-art on the benchmarks. 
+Ravanbakhshらの研究[35]では、画像から画像への変換[21]を利用して、混雑したシーンでの異常検出問題を検討し、ベンチマークでは最先端の成果を上げている。
+
+The approach is to train two conditional GANs. The rst generator produces optical flow from frames, while the second generates frames from optical-flow.
+アプローチは、2つの条件付きGANを訓練することである。第１の生成器はフレームからオプティカルフローを生成し、第２の生成器はオプティカルフローからフレームを生成する。
+
+The generalisability of the approach mentioned above is problematic since in many cases datasets do not have temporal features. 
+多くの場合、データセットには時間的特徴がないため、上記のアプローチの一般化は問題がある。
+
+One of the most in uential accounts of anomaly detection using adversarial training comes from Schlegl et al. [39]. 
+逆境訓練を用いた異常検出の最も重要な記述の1つは、Schleglら[39]によるものです。
+
+The authors hypothesize that the latent vector of the GAN represents the distribution of the data. 
+著者らは、GANの潜在ベクトルがデータの分布を表していると仮説を立てている。
+
+However, mapping to the vector space of the GAN is not straightforward. To achieve this, the authors rst train a generator and discriminator using only normal images. 
+しかし、GANのベクトル空間へのマッピングは簡単ではない。これを実現するために、著者らはまず、通常の画像のみを用いて生成器と識別器を訓練した。
+
+In the next stage, they utilize the pretrained generator and discriminator by freezing the weights and remap to the latent vector by optimizing the GAN based on the z vector. 
+次の段階では、あらかじめ訓練された生成器と識別器を利用して、重みを凍結し、zベクトルに基づいてGANを最適化することで潜在ベクトルにリマップする。
+
+During inference, the model pinpoints an anomaly by outputting a high anomaly score, reporting signicant improvement over the previous work. 
+推論時には、前作よりも有意に改善された異常スコアを出力することで、異常をピンポイントで指摘します。
+
+The main limitation of this work is its computational complexity since the model employs a two-stage approach, and remapping the latent vector is extremely expensive. 
+この研究の主な限界は、モデルが2段階のアプローチを採用していることと、潜在ベクトルのリマッピングが非常に高価であることから、計算が複雑であることです。
+
+In a follow-up study, Zenati et al. [40] investigate the use of BiGAN [14] in an anomaly detection task, examining joint training to map from image space to latent space simultaneously, and vice-versa. 
+Zenatiら[40]は、画像空間から潜在空間へのマッピングを同時に行うための共同訓練と、その逆の共同訓練を検討し、異常検出タスクにおけるBiGAN[14]の使用を調査している。
+
+
+Training the model via [39] yields superior results on the MNIST[25] dataset.
+39]を用いてモデルを学習すると，MNIST[25]のデータセットで優れた結果が得られる．
+
+Overall prior work strongly supports the hypothesis that the use of autoencoders and GAN demonstrate promise in anomaly detection problems [23,39,40].
+全体的な先行研究は、オートエンコーダーとGANの使用が異常検出問題において有望であるという仮説を強く支持している[23,39,40]。
+
+Motivated by the idea of GAN with inference studied in [39] and [40], we introduce a conditional adversarial network such that generator comprises encoder-decoder-encoder sub-networks, learning representations in both image and latent vector space jointly, and achieving state-of-the-art performance both statistically and computationally.
+39]や[40]で研究されている推論付きGANの考え方にヒントを得て，エンコーダー-デコーダー-エンコーダー-エンコーダーのサブネットワークからなる生成器を導入し，画像空間と潜在ベクトル空間の両方の表現を共同で学習することで，統計的にも計算量的にも最先端の性能を実現している．
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+3 Our Approach: GANomaly
+To explain our approach in detail, it is essential to brifley introduce the back-ground of GAN.
+3 私たちのアプローチ。GANomaly
+我々のアプローチを詳しく説明するためには、GANの背景を簡単に紹介する必要があります。
+
+
+Generative Adversarial Networks (GAN) are an unsupervised machine learning algorithm that was initially introduced by Goodfellow et al. [16].
+Generative Adversarial Networks (GAN)は、Goodfellowら[16]によって最初に導入された教師なし機械学習アルゴリズムである。
+
+
+
+
+The original primary goal of the work is to generate realistic images. 
+本来の第一の目的は、リアルな画像を生成することです。
+The idea being that two networks (generator and discriminator) compete with each other during training such that the former tries to generate an image, while the latter decides whether the generated image is a real or a fake. 
+これは、2つのネットワーク（生成器と識別器）が訓練中に互いに競い合い、前者は画像を生成しようとし、後者は生成された画像が本物か偽物かを判断するという考え方です。
+
+The generator is a decoder-alike network that learns the distribution of input data from a latent space.
+生成器は、入力データの分布を潜在空間から学習するデコーダライクネットワークである。
+
+The primary objective here is to model high dimensional data that captures the original real data distribution. 
+ここでの第一の目的は、元の実データの分布をキャプチャする高次元データをモデル化することです。
+
+The discriminator network usually has a classical classication architecture, reading an input image, and determining its validity (i.e., real vs. fake).
+識別器ネットワークは、通常、古典的な分類アーキテクチャを有し、入力画像を読み取り、その妥当性（すなわち、本物対偽物）を決定する。
+
+
+
+
+
+GAN have been intensively investigated recently due to their future potential[12]. 
+GANはその将来性から最近集中的に研究されている[12]。
+
+To address training instability issues, several empirical methodologies have been proposed [7, 38]. 
+訓練の不安定性の問題に対処するために、いくつかの経験的方法論が提案されている [7, 38]。
+
+One well-known study that receives attention in the liter-ature is Deep Convolutional GAN (DCGAN) by Radford and Chintala [34], who introduce a fully convolutional generative network by removing fully connected layers and using convolutional layers and batch-normalization [20] throughout the network. 
+リテラチャーで注目されているよく知られた研究としては、RadfordとChintalaによるDeep Convolutional GAN（DCGAN）[34]があり、完全に接続された層を除去し、ネットワーク全体で畳み込み層とバッチ正規化[20]を使用することで完全畳み込み生成ネットワークを導入している。
+
+The training performance of GAN is improved further via the use of Wasserstein loss [8, 17].
+GANの学習性能は、Wasserstein損失を使用することでさらに向上します[8, 17]。
+
+
+
+
+
+
+Adversarial Auto-Encoders (AAE) consist of two sub-networks, namely an encoder and a decoder. 
+逆境自動エンコーダ（AAE）は、エンコーダとデコーダという2つのサブネットワークで構成されています。
+
+This structure maps the input to latent space and remaps back to input data space, known as reconstruction. 
+この構造は、入力を潜在空間にマッピングし、再構成として知られる入力データ空間にリマップして戻す。
+
+Training autoencoders with adversarial setting enable not only better reconstruction but also control over latent space. [12, 27, 31].
+また、敵対的な設定で自動エンコーダーを訓練することで、より良い再構成が可能になるだけでなく、潜在的な空間の制御も可能になる。[12, 27, 31].
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+GAN with Inference are also used within discrimination tasks by exploiting latent space variables [10]. 
+推論を用いたGANは、潜在空間変数を利用した識別タスクの中でも使用されている[10]。
+
+For instance, the research by [11] suggests that networks are capable of generating a similar latent representation for related high-dimensional image data. 
+例えば、[11]の研究では、ネットワークが関連する高次元の画像データに対して同様の潜在表現を生成することができることが示唆されている。
+
+Lipton and Tripathi [26] also investigate the idea of inverse mapping by introducing a gradient-based approach, mapping images back to the latent space. 
+Lipton and Tripathi [26]もまた、画像を潜在空間にマッピングするグラデーションベースのアプローチを導入することで、逆マッピングの考え方を調査している。
+
+This has also been explored in [15] with a specic focus on joint training of generator and inference networks. 
+これは、[15]でも探索されており、特にジェネレータと推論ネットワークの共同訓練に焦点を当てている。
+
+The former network maps from latent space to high-dimensional image space, while the latter maps from image to latent space. 
+前者は潜在空間から高次元の画像空間に写像し、後者は画像から潜在空間に写像する。
+
+Another study by Donahue et al. [14] suggests that with the additional use of an encoder network mapping from image space to latent space, a vanilla GAN network is capable of learning inverse mapping.
+Donahueらによる別の研究[14]では、画像空間から潜在空間へのエンコーダネットワークのマッピングを追加で使用することで、バニラGANネットワークが逆マッピングを学習できることが示唆されている。
+
+
+3.1 Proposed Approach
+3.1 提案されたアプローチ
+
+Problem Denition. Our objective is to train an unsupervised network that detects anomalies using a dataset that is highly biased towards a particular class - i.e., comprising normal non-anomalous occurrences only for training. 
+問題の定義。我々の目的は、特定のクラスに大きく偏ったデータセットを用いて異常を検出する教師なしネットワークを訓練することである。
+
+The formal denition of this problem is as follows:
+この問題の正式な定義は以下の通りです。
+
+
+We are given a large tranining dataset D comprising only M normal images,
+M個の正規画像のみからなる大規模なトランニングデータセットDが与えられる。
+D = (X1; : : : ;XM)
+
+
+and a smaller testing dataset Dhat of N normal and abnormal images,
+と、N個の正常画像と異常画像からなるより小さなテストデータセットDhatを用いています。
+
+Dhat= (Xhat_1; y_1) ~ (Xhat_N; y_N)
+
+where y_i 属する [0; 1] 
+
+denotes the image label.
+画像ラベルを表します。
+
+
+In the practical setting, the training set is signicantly larger than the test set such that M >> N.
+実用的な設定では、訓練集合は、M >> Nとなるようなテスト集合よりも符号的に大きい。
+
+
+
+
+
+Given the dataset, our goal is rst to model D to learn its manifold, then detect the abnormal samples in Dhat as outliers during the inference stage. 
+データセットが与えられると、我々の目標は、まずDをモデル化してその多様性を学習し、推論の段階でDhatの異常なサンプルを外れ値として検出することです。
+
+The model f learns both the normal data distribution and minimizes the output anomaly score A(x). 
+モデルfは、正規データ分布の両方を学習し、出力異常スコアA(x)を最小化します。
+
+For a given test image xhat, a high anomaly score of A(xhat) indicates possible anomalies within the image. 
+与えられたテスト画像xhatに対して、A(xhat)の高い異常スコアは画像内の異常の可能性を示します。
+
+The evaluation criteria for this is to threshold (φ) the score, where A(xhat) > φ indicates anomaly.
+その評価基準は、スコアを閾値（φ）とし、Ａ（ｘｈａｔ）＞φは異常を示す。
+
+
+
+
+
+
+
+Ganomaly Pipeline.
+
+
+
+
+Figure 2 illustrates the overview of our approach, which contains two encoders, a decoder, and discriminator networks, employed within three sub-networks.
+図2は、3つのサブネットワーク内に2つのエンコーダ、1つのデコーダ、および識別器ネットワークを含む、我々のアプローチの概要を示しています。
+
+
+
+
+First sub-network is a bow tie autoencoder network behaving as the generator part of the model.
+ The generator learns the input data representation and reconstructs the input image via the use of an encoder and a decoder network,respectively. 
+最初のサブネットワークは、モデルの生成部として動作する蝶ネクタイオートエンコーダーネットワークである。
+生成器は入力データの表現を学習し、エンコーダとデコーダネットワークを用いて入力画像を再構成する。
+
+The formal principle of the sub-network is the following: 
+
+The generator G first reads an input image x, where x 属する R_w*h*c, and forward-passes it to its encoder network GE.
+生成器 G は、まず入力画像 x（x 属する R_w*h*c）を読み込み、それをエンコーダネットワーク GE にフォワードパスします。
+
+
+With the use of convolutional layers followed by batch-norm and leaky ReLU() activation, respectively, GE downscales x by compressing it to a vector z, where z 属する R_d. 
+畳み込み層を使用して、バッチノルムとリーキーReLU()をそれぞれ活性化することで、GEはxをベクトルzに圧縮することでダウンスケールする。
+
+z is also known as the bottleneck features of G and hypothesized to have the smallest dimension containing the best representation of x. 
+zはGのボトルネック特徴としても知られており、xの最良の表現を含む最小次元を持つと仮定されています。
+
+
+The decoder part GD of the generator network G adopts the architecture of a DCGAN generator [34], using convolutional transpose layers, ReLU() activation and batch-norm together with a tanh layer at the end. 
+ジェネレータネットワークＧのデコーダ部ＧＤは、畳み込みトランスポーズ層、ＲｅＬＵ()活性化、バッチノルムを使用し、最後にｔａｎｈ層と共にＤＣＧＡＮジェネレータ［３４］のアーキテクチャを採用している。
+
+This approach upscales the vector z to reconstruct the image x as ^x. Based on these, the generator network G generates image ^x via ^x = GD(z), where z = GE(x).
+このアプローチでは、ベクトルｚをアップスケールして画像ｘを^xとして再構成する。これらに基づいて、生成ネットワークＧは、^x = GD(z)を介して画像^xを生成し、ここで、z = GE(x)とする。
+
+
+
+
+
+
+
+The second sub-network is the encoder network E that compresses the image ^x that is reconstructed by the network G. 
+第２のサブネットワークは、ネットワークＧによって再構成された画像^xを圧縮するエンコーダネットワークＥである。
+
+With different parametrization,it has the same architectural details as GE. 
+別のparametrizationを使うと、それにGEと同じ建築の細部があります。
+
+E downscales ^x to find its feature representation ^z = E(^x). 
+E は ^x をダウンスケールしてその特徴表現 ^z = E(^x) を求めます。
+
+
+The dimension of the vector ^z is the same as that of z for consistent comparison. 
+ベクトル^zの次元は、一貫した比較のためにzの次元と同じです。
+
+This sub-network is one of the unique parts of the proposed approach. 
+このサブネットワークは、提案されたアプローチのユニークな部分の一つである。
+
+Unlike the prior autoencoder-based approaches, in which the minimization of the latent vectors is achieved via the bottleneck features, this subnetwork E explicitly learns to minimize the distance with its parametrization. 
+ボトルネック特徴量を介して潜在ベクトルの最小化が達成される先行のオートエンコーダーベースのアプローチとは異なり、このサブネットワークEは、そのパラメトリック化で距離を最小化することを明示的に学習する。
+
+During the test time, moreover, the anomaly detection is performed with this minimization.
+また、試験時間中は、この最小化した状態で異常検出を行います。
+
+The third sub-network is the discriminator network D whose objective is to classify the input x and the output ^x as real or fake, respectively. 
+3番目のサブネットワークは、入力xと出力^xをそれぞれ本物か偽物かで分類することを目的とした識別ネットワークDです。
+
+This subnetwork is the standard discriminator network introduced in DCGAN [34].
+このサブネットワークは、ＤＣＧＡＮ［３４］で導入された標準的な判別器ネットワークである。
+
+Having dened our overall multi-network architecture, as depicted in Figure 2, we now move on to discuss how we formulate our objective for learning.
+図2に示されているように、全体的なマルチネットワーク・アーキテクチャを定義したので、次に学習の目的をどのように定式化するかについて説明します。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+3.2 Model Training
+
+We hypothesize that when an abnormal image is forward-passed into the network G, GD is not able to reconstruct the abnormalities even though GE manages to map the input X to the latent vector z. 
+我々は、異常画像がネットワークGにフォワードパスされた場合、GEが入力Xを潜在ベクトルzにマッピングしても、GDは異常を再構成できないという仮説を立てた。
+
+
+This is because the network is modeled only on normal samples during training and its parametrization is not suitable for generating abnormal samples. 
+これは、ネットワークが学習時に正常なサンプルのみをモデル化しており、そのパラメトリック化が異常なサンプルの生成に適していないためである。
+
+An output ^X that has missed abnormalities can lead to the encoder network E mapping ^X to a vector ^z that has also missed abnormal feature representation, causing dissimilarity between z and ^z.
+異常を見逃した出力^Xは、エンコーダネットワークEが^Xを同じく異常な特徴表現を見逃したベクトル^zにマッピングしてしまい、zと^zの間の不一致を引き起こす可能性がある。
+
+When there is such dissimilarity within latent vector space for an input image X, the model classies X as an anomalous image. 
+入力画像Xに対して潜在ベクトル空間内にこのような非類似性がある場合、モデルはXを異常画像として分類する。
+
+To validate this hypothesis, we formulate our objective function by combining three loss functions, each of which optimizes individual sub-networks.
+この仮説を検証するために、我々は3つの損失関数を組み合わせて目的関数を定式化し、それぞれが個々のサブネットワークを最適化する。
+
+
+
+
+
+
+Adversarial Loss. 
+敵対的な損失。
+Following the current trend within the new anomaly detection approaches [39, 40], we also use feature matching loss for adversarial learning. 
+新しい異常検出アプローチ[39, 40]の中での現在の傾向を踏襲し、我々はまた、敵対学習のために特徴一致損失を使用しています。
+
+Proposed by Salimans et al. [38], feature matching is shown to reduce the instability of GAN training. 
+Salimansら[38]によって提案された特徴照合は、GAN学習の不安定性を軽減することが示されている。
+
+Unlike the vanilla GAN where G is updated based on the output of D (real/fake), here we update G based on the internal representation of D. 
+バニラのGANではDの出力（リアル/フェイク）に基づいてGを更新していましたが、ここではDの内部表現に基づいてGを更新しています。
+
+Formally, let f be a function that outputs an intermediate layer of the discriminator D for a given input x drawn from the input data distribution pX, feature matching computes the L2 distance between the feature representation of the original and the generated images, respectively. 
+形式的には、入力データ分布pXから引き出された所定の入力xに対して識別器Dの中間層を出力する関数をfとし、特徴照合は、原画像の特徴表現と生成された画像の特徴表現の間のL2距離をそれぞれ計算する。
+
+
+Hence, our adversarial loss Ladv is dened as:
+したがって、私たちの敵対的な損失Ladvは次のように否定されます。
+
+Ladv = E_x~pX ||f(x) - Ex~pX f(G(x))||_2
+
+
+
+Contextual Loss. 
+文脈上の損失。
+The adversarial loss Ladv is adequate to fool the discriminator D with generated samples. 
+生成されたサンプルで識別器Ｄを誤魔化すには、敵対的損失Ｌadvが十分である。
+
+However, with only an adversarial loss, the generator is not optimized towards learning contextual information about the input data. 
+しかし、敵対的損失だけでは、生成器は入力データに関する文脈情報の学習に向けて最適化されていない。
+
+It has been shown that penalizing the generator by measuring the distance between the input and the generated images remedies this issue [21].
+入力画像と生成画像の間の距離を測定することで生成者にペナルティを与えることでこの問題を解決できることが示されている[21]。
+
+Isola et al. [21] show that the use of L1 yields less blurry results than L2. 
+Isolaら[21]は、L1を使用すると、L2よりもブレの少ない結果が得られることを示している。
+
+Hence, we also penalize G by measuring the L1 distance between the original x and the generated images (^x = G(x)) using a contextual loss Lcon dened as:
+したがって、我々はまた、コンテキストロスLconを使用して、元のxと生成された画像の間のL1距離（^x = G(x)）を測定することによって、Gにペナルティを与えます。
+
+
+Lcon = Ex~pX||x - G(x)||1
+
+
+
+Encoder Loss.
+
+The two losses introduced above can enforce the generator to produce images that are not only realistic but also contextually sound. 
+上記で紹介した2つの損失は、現実的であるだけでなく、文脈的に健全な画像を生成するためにジェネレータを強制することができます。
+Moreover,we employ an additional encoder loss Lenc to minimize the distance between the bottleneck features of the input (z=GE(x)) and the encoded features of the generated image (ˆz=E(G(x))).
+さらに、入力のボトルネック特徴（z=GE(x)）と生成画像の符号化特徴（ˆz=E(G(x))）との距離を最小化するために、追加のエンコーダ損失Lencを採用しています。
+
+Lenc is formally defined as
+Lencは正式には次のように定義されています。
+
+
+Lenc=Ex∼pX‖GE(x)−E(G(x))‖2.
+
+
+In so doing, the generator learns how to encode features of the generated image for normal samples. 
+そうすることで、生成器は、生成された画像の特徴を正常なサンプルに対してどのように符号化するかを学習する。
+
+For anomalous inputs, however, it will fail to minimize the distance between the input and the generated images in the feature space since both G and E networks are optimized towards normal samples only.
+しかし、異常な入力の場合は、G ネットワークと E ネットワークの両方が正常なサンプルに対してのみ最適化されているため、特徴空間における入力画像と生成画像の間の距離を最小化することができません。
+
+Overall, our objective function for the generator becomes the following:
+全体的に、発電機の目的関数は以下のようになります。
+
+
+L = wadv Ladv + wcon Lcon + wenc Lenc
+
+
+
+where wadv,wadv and wadv are the weighting parameters adjusting the impact of individual losses to the overall objective function.
+ここで wadv,wadv および wadv は、全体的な目的関数に対する個々の損失の影響を調整する重み付けパラメータです。
+
+
+
+
+3.3    Model Testing
+
+During the test stage, the model usesLencgiven in Eq 3 for scoring the abnormality of a given image. 
+テスト段階では、モデルは、与えられた画像の異常性をスコアリングするために式3で与えられたLencを使用します。
+
+Hence, for a test sample ˆx, our anomaly scoreA(ˆx) or sˆx is defined as
+
+したがって、テストサンプルˆxに対して、我々の異常スコアA(ˆx)またはsˆxはこのように定義されます。
+
+A(ˆx) =‖GE(ˆx)−E(G(ˆx))‖1
+
+
+
+
+
+
+To evaluate the overall anomaly performance, we compute the anomaly score for individual test sample ˆxwithin the test setˆD, which in turn yields us a set of anomaly scores S={si:A( ˆxi), ˆxi∈ˆD}. 
+全体的な異常性能を評価するために、テストセットˆD内の個々のテストサンプルˆxの異常スコアを計算します。
+
+We then apply feature scaling to have the anomaly scores within the probabilistic range of [0,1].
+そして、異常スコアが[0,1]の確率的範囲内になるように特徴量のスケーリングを適用します。
+
+s′i = si − min(S)  /  max(S)−min(S)
+
+The use of Eq 6 ultimately yields an anomaly score vector S′ for the final evaluation of the test setˆD.
+式6の使用は、最終的にテストセットˆDの最終評価のための異常スコアベクトルS′をもたらします。
+
+
+
+
+
+
+
+4  Experimental Setup
+
+To evaluate our anomaly detection framework, we use three types of datase tranging from the simplistic benchmark of MNIST [25], the reference benchmark of CIFAR [24] and the operational context of anomaly detection within X-ray security screening [5].
+我々の異常検出フレームワークを評価するために、MNISTのシンプルなベンチマーク[25]、CIFARのリファレンスベンチマーク[24]、X線セキュリティスクリーニング[5]における異常検出の運用コンテキストの3種類のデータを使用しています。
+
+MNIST.
+
+To replicate the results presented in [40], we first experiment on MNIST data [25] by treating one class being an anomaly, while the rest of the classes  are  considered  as  the  normal  class.
+40]で示された結果を再現するために，まずMNIST [25]のデータを用いて，1つのクラスを異常クラスとし，残りのクラスを通常のクラスとみなす実験を行う．
+
+In  total,  we  have  ten  sets  of  data, each of which consider individual digits as the anomaly.
+合計で10組のデータがあり、それぞれが個別の桁を異常と考えています。
+
+
+CIFAR10.
+
+Within our use of the CIFAR dataset, we again treat one class as abnormal and the rest as normal.  
+CIFARデータセットの使用において、我々は再び1つのクラスを異常、残りのクラスを正常として扱います。 
+
+We then detect the outlier anomalies as instances drawn from the former class by training the model on the latter labels.
+そして、後者のラベルでモデルを学習させることで、前者のクラスから抽出されたインスタンスとして外れ値異常を検出します。
+
+University  Baggage  Anomaly  Dataset  —  (UBA).
+
+
+This  sliding  window patched-based dataset comprises 230,275 image patches. Normal samples are extracted via an overlapping sliding window from a full X-ray image, constructed using  single  conventional  X-ray  imagery  with  associated  false  color  materials mapping from dual-energy [36]. 
+このスライディングウィンドウパッチベースのデータセットは、230,275枚の画像パッチで構成されています。通常の単一のX線画像を用いて作成された完全なX線画像から、スライドウィンドウを重ね合わせて正常なサンプルを抽出し、デュアルエネルギー[36]の偽色材料マッピングを行います。
+
+
+Abnormal classes (122,803) are of 3 sub-classes knife (63,496), gun (45,855) and gun component (13,452) — contain manually cropped threat objects together with sliding window patches whose intersection over union with the ground truth is greater than 0.3.
+異常クラス(122,803)は、ナイフ(63,496)、銃(45,855)、銃コンポーネント(13,452)の3つのサブクラスから構成されています。
+
+
+Full  Firearm  vs.  Operational  Benign  —  (FFOB).
+完全な銃器 vs. 操作上のベニグン - （FFOB）。
+
+In  addition  to  these datasets, we also use the UK government evaluation dataset [1], comprising both expertly concealed firearm (threat) items and operational benign (non-threat) imagery from commercial X-ray security screening operations (baggage/parcels).
+これらのデータセットに加えて、英国政府の評価データセット[1]も利用しています。これらのデータセットは、専門的に隠された銃器（脅威）アイテムと、商業用X線セキュリティスクリーニング業務（手荷物/小包）で撮影された良性（非脅威）の画像の両方から構成されています。
+
+Denoted  as  FFOB,  this  dataset  comprises  4,680  firearm  full-weapons  as  full abnormal and 67,672 operational benign as full normal images, respectively.
+FFOBと呼ばれるこのデータセットは、完全異常画像として4,680枚の銃器フルウェポン画像と、完全正常画像として67,672枚の操作良性画像から構成されている。
+
+The procedure for train and test set split for the above datasets is as follows:
+上記データセットに対する訓練集合とテスト集合の分割の手順は以下の通りである。
+
+we split the normal samples such that 80% and 20% of the samples are considered as part of the train and test sets, respectively. 
+ここでは，正常なサンプルの80%と20%をそれぞれ訓練セットとテストセットの一部とみなすように，正常なサンプルを分割します．
+
+We then resize MNIST to 32×32 DBA and FFOB to 64×64, respectively.
+そして、ＭＮＩＳＴを３２×３２ＤＢＡ、ＦＦＯＢを６４×６４にそれぞれリサイズする。
+
+
+
+Following Schleglet al.[39] (AnoGAN) and Zenatiet al.[40] (EGBAD), our adversarial  training  is  also  based  on  the  standard  DCGAN  approach  [34]  for a consistent comparison. 
+Schleglet al.[39] (AnoGAN) と Zenatiet al.[40] (EGBAD) に続き、我々の敵対訓練も、一貫した比較のために標準的な DCGAN アプローチ [34] に基づいている。
+
+As such, we aim to show the superiority of our multi-network architecture regardless of using any tricks to improve the GAN training.
+このように、我々はGANトレーニングを向上させるためにどんなトリックを使っても、我々のマルチネットワークアーキテクチャの優位性を示すことを目指しています。
+
+In  addition,  we  also  compare  our  method  against  the  traditional  variational autoencoder architecture [6] (VAE) to show the advantage of our multi-network architecture. 
+さらに、我々の手法を従来の変分自動エンコーダーアーキテクチャ[6] (VAE)と比較し、マルチネットワークアーキテクチャの優位性を示す。
+
+We implement our approach in PyTorch [32] (v0.4.0 with Python 3.6.5) by optimizing the networks using Adam [22] with an initial learning rate lr= 2e−3, and momentumsβ1= 0.5,β2= 0.999. 
+我々はPyTorch [32] (v0.4.0、Python 3.6.5)を用いて、Adam [22]を用いて初期学習率lr=2e-3、運動量β1=0.5,β2=0.999でネットワークを最適化することで、我々のアプローチを実装している。
+
+
+Our model is optimized based on the weighted lossL(defined in Equation 4) using the weight valueswbce= 1, wrec= 50 andwenc= 1, which were empirically chosen to yield optimum results.
+我々のモデルは、経験的に最適な結果が得られるように選択された重み値wbce=1, wrec=50, wenc=1を用いて、式4で定義された重み付き損失Lに基づいて最適化されている。
+
+(Figure 5 (b)).
+
+We train the model for 15, 25, 25 epochs for MNIST, UBA and FFOB  datasets,  respectively.  
+MNIST, UBA, FFOBのデータセットに対して、それぞれ15, 25, 25エポックでモデルを学習した。 
+
+Experimentation  is  performed  using  a  dual-core Intel Xeon E5-2630 v4 processor and NVIDIA GTX Titan X GPU.
+デュアルコアのIntel Xeon E5-2630 v4プロセッサとNVIDIA GTX Titan X GPUを使って実験を行っています。
+
+
+
+
+5  Results
+
+
+We  report  results  based  on  the  area  under  the  curve  (AUC)  of  the  Receiver Operating Characteristic (ROC), true positive rate (TPR) as a function of false positive rate (FPR) for different points, each of which is a TPR-FPR value for different thresholds.
+受信機動作特性（ROC）の曲線下面積（AUC）に基づいた結果を、異なる点についての偽陽性率（FPR）の関数としての真陽性率（TPR）に基づいて、それぞれ異なるしきい値についてのTPR-FPR値を報告する。
+
+Figure 4(a) presents the results obtained on MNIST data using 3 different random seeds, where we observe the clear superiority of our approach over previous contemporary models [6, 39, 40]. 
+図4(a)は3つの異なるランダムシードを用いたMNISTデータで得られた結果を示しており, 我々のアプローチが従来のモデル[6, 39, 40]よりも明らかに優れていることがわかる. 
+
+For each digit chosen as anomalous, our model  achieves  higher  AUC  than  EGBAD  [40],  AnoGAN  [39]  and  variational autoencoder pipeline VAE [6]. 
+変則として選択された各桁について、我々のモデルはEGBAD [40]、AnoGAN [39]、変分自動エンコーダーパイプラインVAE [6]よりも高いAUCを達成している。
+
+Due to showing its poor performance within relatively unchallenging dataset, we do not include VAE in the rest of experiments.
+比較的難易度の低いデータセットでは性能が低いため、残りの実験ではVAEを含まないことにしました。
+
+Figure 4(b)  shows  the  performance  of  the  models  trained  on  the  CIFAR10 dataset. 
+図4(b)は、CIFAR10データセットで学習したモデルの性能を示しています。
+
+We see that our model achieves the best AUC performance for any of the class chosen as anomalous. 
+我々のモデルは、異常値として選択されたどのクラスに対しても、最高のAUC性能を達成していることがわかります。
+
+The reason for getting relatively lower quantitative results within this dataset is that for a selected abnormal category, there exists a normal class that is similar to the abnormal (plane vs. bird, cat vs. dog,horse vs. deer and car vs. truck).
+このデータセットの中で相対的に量的に低い結果が得られる理由は、選択された異常カテゴリに対して、異常に類似した正常なクラスが存在するからです（飛行機対鳥、猫対犬、馬対鹿、自動車対トラック）。
+
+
+
+For UBA and FFOB datasets shown in Table 1, our model again outperforms other approaches excluding the case of theknife. 
+表1に示したUBAとFFOBのデータセットでは、我々のモデルはナイフのケースを除いた他のアプローチよりも優れている。
+In fact, the performance of the models for knifeis comparable. 
+実際には、knifeisのためのモデルの性能は同等です。
+
+Relatively lower performance of this class is its shape simplicity, causing an overfit and hence high false positives. 
+このクラスの性能が比較的低いのは、形状が単純であるため、オーバーフィットが発生し、その結果、高い偽陽性が発生しているからです。
+
+For the overall performance, however, our approach surpasses the other models, yielding AUC of 0.666 and 0.882 on the UBA and FFOB datasets, respectively.
+しかし、全体的な性能については、我々のアプローチは他のモデルを上回り、UBAとFFOBのデータセットでそれぞれ0.666と0.882のAUCを得た。
+
+
+Figure 5 depicts  how  the  choice  of  hyper-parameters  ultimately  affect  the overall performance of the model. 
+図5は、ハイパーパラメータの選択が最終的にモデルの全体的な性能にどのように影響するかを示しています。
+
+
+In Figure 5 (a), we see that the optimal performance is achieved when the size of the latent vectorzis 100 for the MNIST dataset with an abnormal digit-2. 
+図５（ａ）において、異常な桁数２のMNISTデータセットに対して、潜在ベクトルの大きさを100とした場合に最適な性能が得られることがわかる。
+
+Figure 5 (b) demonstrates the impact of tuning the loss function in Equation 4 on the overall performance. 
+図５（ｂ）は、式４の損失関数のチューニングが全体の性能に与える影響を示している。
+
+The model achieves the  highest  AUC  whenwbce=  1,wrec=  50  andwenc=  1.  
+このモデルは、wbce=1,wrec=50,wenc=1のときに最も高いAUCを達成した。 
+
+We  empirically observe the same tuning-pattern for the rest of datasets.
+我々は経験的に、他のデータセットについても同じチューニングパターンを観測している。
+
+Figure 6 provides the histogram of the anomaly scores during the inference stage (a) and t-SNE visualization of the features extracted from the last convolutional layer of the discriminator network (b). 
+図６は、推論段階における異常スコアのヒストグラム（ａ）と、識別ネットワークの最後の畳み込み層（ｂ）から抽出された特徴のｔ-ＳＮＥ可視化を示す図である。
+
+Both of the figures demonstrate a clear separation within the latent vectorzand feature f(.) spaces.
+両方の図は、潜在ベクトルzと特徴量f(.)空間内での明確な分離を示しています。
+
+Table 2 illustrates the runtime performance of the GAN-based models. 
+表2にGANベースのモデルのランタイム性能を示します。
+
+Compared  to  the  rest  of  the  approaches,  AnoGAN  [39]  is  computationally  rather expensive  since  optimization  of  the  latent  vector  is  needed  for  each  example.
+他のアプローチと比較して、AnoGAN [39] は、各例に対して潜在ベクトルの最適化が必要となるため、計算量が多くなります。
+
+For EGBAD [40], we report similar runtime performance to that of the original paper. 
+EGBAD [40]については、原著論文と同様の実行性能を報告している。
+
+Our approach, on the other hand, achieves the highest runtime performance. 
+一方、我々のアプローチは、最高の実行時性能を実現しています。
+
+Runtime performance of both UBA and FFOB datasets are comparable to MNIST even though their image and network size are double than that of MNIST.
+UBAとFFOBの両方のデータセットのランタイム性能は、画像サイズとネットワークサイズがMNISTの2倍であるにもかかわらず、MNISTと同等である。
+
+
+
+Fig. 5.
+(a) Overall performance of the model based on varying size of the latent vector z. 
+(b) Impact of weighting the losses on the overall performance. 
+Model is trained on MNIST dataset with an abnormal digit-2
+
+図5.
+(a) 潜在ベクトル z の大きさを変化させた場合のモデルの全体的な性能。
+(b)損失に重み付けをした場合の全体性能への影響。
+モデルはMNISTデータセットの異常な桁数-2
+
+
+Fig. 6.
+(a) Histogram of the scores for both normal and abnormal test samples. 
+(b) t-SNE  visualization  of  the  features  extracted  from  the  last  conv  layer f(.)  of  the discriminator
+
+
+図６に示すように、正常検査サンプルと異常検査サンプルの得点のヒストグラムを示します。
+(a) 正常・異常試験サンプルのスコアのヒストグラム。
+(b) 判別器の最後の conv 層 f(.) から抽出された特徴の t-SNE による可視化
+
+
+
+A set of examples in Figure 7 depict real and fake images that are respectively the input and output of our model. We expect the model to fail when generating anomalous samples. 
+図7の一連の例は、我々のモデルの入力と出力である実物と偽物の画像をそれぞれ示しています。異常なサンプルを生成した場合、モデルは失敗すると予想されます。
+
+
+As can be seen in Figure 7(a), this is not the case for the class of 2 in the MNIST data. 
+図7(a)に見られるように，MNISTのデータの中のクラス2の場合はそうではない．
+
+This stems from the fact that MNIST dataset is relatively unchallenging, and the model learns sufficient information to be able to generate samples not seen during training. 
+これは、MNISTのデータセットが比較的チャレンジングではなく、モデルが十分な情報を学習して、訓練中に見られないサンプルを生成することができるという事実に由来します。
+
+
+Another conclusion that could be drawn is that distance in the latent vector space provides adequate details for detecting anomalies even though the model cannot distinguish abnormalities in the image space. 
+もう一つの結論は、モデルが画像空間の異常を区別できなくても、潜在ベクトル空間の距離が異常を検出するのに十分な詳細さを提供しているということである。
+
+On the contrary to the MNIST experiments, this is not the case.
+MNISTの実験とは逆に、このようなことはありません。
+
+Figures 7 (b-c) illustrate that model is unable to produce abnormal objects.
+図７（ｂ-ｃ）は、モデルが異常物を生成できないことを説明するための図である。
+
+Overall these results purport that our approach yields both statistically and computationally superior results than leading state-of-the-art approaches [39,40].
+これらの結果を総合すると、我々のアプローチは最先端のアプローチ[39,40]よりも統計的にも計算量的にも優れた結果をもたらしていることがわかります。
+
+
+
+
+
+
+6  Conclusion
+
+
+We introduce a novel encoder-decoder-encoder architectural model for general anomaly  detection  enabled  by  an  adversarial  training  framework. 
+本研究では、逆探学習フレームワークを用いた一般的な異常検出のための新しいエンコーダ-デコーダ-エンコーダアーキテクチャモデルを紹介する。
+
+Experimentation across dataset benchmarks of varying complexity, and within the operational anomaly detection context of X-ray security screening, shows that the proposed method outperforms both contemporary state-of-the-art GAN-based and traditional autoencoder-based anomaly detection approaches with generalization ability to any anomaly detection task. 
+複雑さの異なるデータセットベンチマークを用いて、X線セキュリティスクリーニングの運用上の異常検出コンテキストで実験を行った結果、提案手法は、あらゆる異常検出タスクに対して一般化能力を持ち、最新のGANベースの異常検出アプローチと従来のオートエンコーダーベースの異常検出アプローチの両方を凌駕することが示されました。
+
+Future work will consider employing  emerging  contemporary  GAN  optimizations  [7, 17, 38],  known  to  improve generalized adversarial training.
+今後の研究では、一般化された敵対者訓練を改善することが知られている最新のGAN最適化[7, 17, 38]の採用を検討する予定である。
+
+
+
+
+
+
+
+
